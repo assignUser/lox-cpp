@@ -1,10 +1,17 @@
 # vim: set filetype=just :
-default: configure build run
+default: workflow
 
 export CMAKE_EXPORT_COMPILE_COMMANDS := "ON"
 export CMAKE_GENERATOR := "Ninja"
+
+clean:
+  cmake --workflow --preset clean
+
+workflow:
+  cmake --workflow --preset default
+
 configure:
-  cmake -B build .
+  cmake --preset default 
 
 build:
   cmake --build build
@@ -12,5 +19,5 @@ build:
 run FILE="":
   ./build/lox/lox {{FILE}}
 
-clean:
+clean-all:
   rm -rf build/*
