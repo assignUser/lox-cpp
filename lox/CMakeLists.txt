@@ -1,4 +1,4 @@
-# Copyright (c) assignUser 
+# Copyright (c) assignUser
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,4 +24,5 @@ target_link_libraries(
   PRIVATE fmt::fmt
           tl::expected
           tl::optional
+          bfg::lyra
 )
