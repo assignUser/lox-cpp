@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
   auto result = cli.parse({argc, argv});
 
   if (!result) {
-    std::cerr << "Error in command line: " << result.message() << std::endl;
+    fmt::print(stderr, "Error in commandline: {}\n", result.message());
     exit(1);
   }
 
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
   } else {
     std::ifstream file(filename);
     if (!file.is_open()) {
-      fmt::print("Error opening file: {}\n", filename);
+      fmt::print(stderr,"Error opening file: {}\n", filename);
       std::exit(1);
     } else {
       input_lines = read_input(file);
