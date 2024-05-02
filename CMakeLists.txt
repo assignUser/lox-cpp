@@ -12,12 +12,13 @@ function(configure_target target)
                CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
   )
+  target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR})
 endfunction()
 
 include(cmake/CPM.cmake)
 CPMAddPackage("gh:TartanLlama/expected@1.1.0")
 CPMAddPackage("gh:TartanLlama/optional@1.1.0")
-CPMAddPackage("gh:fmtlib/fmt#10.2.1") 
+CPMAddPackage("gh:fmtlib/fmt#10.2.1")
 CPMAddPackage("gh:bfgroup/Lyra#1.6.1")
 
 add_subdirectory(lox)

@@ -3,5 +3,6 @@
 # SPDX-FileCopyrightText: Copyright (c) assignUser
 BasedOnStyle: Google
 DerivePointerAlignment: false
-QualifierAlignment: "Right"
+QualifierAlignment: Right
 ColumnLimit: 100
+IncludeBlocks:: Preserve
