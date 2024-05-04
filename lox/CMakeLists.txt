@@ -6,7 +6,7 @@ configure_target(lox)
 
 target_sources(
   lox
-  PRIVATE main.cpp
+  PRIVATE main.cpp run.cpp
 )
 
 target_link_libraries(

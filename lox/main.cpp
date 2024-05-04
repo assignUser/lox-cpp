@@ -9,21 +9,12 @@
 
 #include "fmt/core.h"
 #include "fmt/format.h"
+#include "lox/run.hpp"
 #include "lyra/arg.hpp"
 #include "lyra/help.hpp"
 #include "lyra/lyra.hpp"
 #include "tl/expected.hpp"
 #include "tl/optional.hpp"
-
-std::vector<std::string> read_input(std::istream &input) {
-  std::vector<std::string> input_lines{};
-
-  for (std::string line; std::getline(input, line);) {
-    input_lines.emplace_back(line);
-  }
-
-  return input_lines;
-}
 
 void print_help() {
   fmt::print("lox - An interpreter for lox written in C++\n");
@@ -47,20 +38,11 @@ int main(int argc, char **argv) {
     print_help();
   }
 
-  auto filename = filenames.at(0);
-  std::vector<std::string> input_lines{};
-  if (filename.empty()) {
-    input_lines = read_input(std::cin);
+  if (filenames.empty()) {
+    runPrompt();
   } else {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-      fmt::print(stderr, "Error opening file: {}\n", filename);
-      std::exit(1);
-    } else {
-      input_lines = read_input(file);
-    }
+    runFile(filenames);
   }
 
-  fmt::print("{}\n", fmt::join(input_lines, "\n"));
   return 0;
 }
