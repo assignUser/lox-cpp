@@ -4,6 +4,7 @@
 #include <fstream>
 #include <numeric>
 #include <optional>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -15,35 +16,68 @@
 #include "tl/expected.hpp"
 #include "tl/optional.hpp"
 
-void echo(std::istream &input) {
+struct Error {
+
+  int line{};
+  std::string where{};
+  std::string message{};
+};
+
+template <> struct fmt::formatter<Error> : fmt::formatter<std::string> {
+  auto format(const Error &e, format_context &ctx) const {
+    return formatter<std::string>::format(
+        fmt::format("[line {}] Error {}  : {}", e.line, e.where, e.message),
+        ctx);
+  }
+};
+
+void report(Error error) {
+  fmt::print(stderr, "{}\n", error);
+  std::exit(1);
+}
+
+tl::expected<int, Error> echo(std::istream &input) {
   std::vector<std::string> input_lines{};
 
   for (std::string line; std::getline(input, line);) {
     input_lines.emplace_back(line);
   }
   fmt::print("{}\n\n", fmt::join(input_lines, "\n"));
+
+  return 0;
 }
 
-void runFile(std::vector<std::string> const &filenames) {
+tl::expected<int, Error> runFile(std::vector<std::string> const &filenames) {
+  tl::expected<int, Error> result;
+
   for (auto const &filename : filenames) {
     std::ifstream file(filename);
-    if (!file.is_open()) {
-      fmt::print(stderr, "Error opening file: {}\n", filename);
-      std::exit(1);
-    } else {
+    if (file.is_open()) {
       fmt::print("{}:\n", filename);
-      echo(file);
+      result = echo(file);
+    } else {
+      return tl::unexpected(Error(-1, filename, "Error opening file."));
     }
   }
+  return result;
 }
 
-void runPrompt() { echo(std::cin); }
+tl::expected<int, Error> runPrompt() { return echo(std::cin); }
 
 void print_help() {
   fmt::print("lox - An interpreter for lox written in C++\n");
   fmt::print("Usage:\n{0:4>}lox <file>...\n{0:4>}<stdin> | lox\n", " ");
   std::exit(0);
 }
+
+class Lox {
+private:
+  bool m_had_error{false};
+  std::vector<std::string> m_filenames{};
+
+public:
+  std::vector<std::string> &filenames() { return m_filenames; }
+};
 
 int main(int argc, char **argv) {
   std::vector<std::string> filenames{};
@@ -61,11 +95,15 @@ int main(int argc, char **argv) {
     print_help();
   }
 
+  tl::expected<int, Error> result;
   if (filenames.empty()) {
-    runPrompt();
+    result = runPrompt();
   } else {
-    runFile(filenames);
+    result = runFile(filenames);
   }
 
+  if (!result) {
+    report(result.error());
+  }
   return 0;
 }
