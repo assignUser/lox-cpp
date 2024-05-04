@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# SPDX-FileCopyrightText: Copyright (c) assignUser
+BasedOnStyle: Google
+DerivePointerAlignment: false
+QualifierAlignment: Right
+ColumnLimit: 100
+IncludeBlocks:: Preserve

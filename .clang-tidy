@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# SPDX-FileCopyrightText: Copyright (c) assignUser
+Checks: >
+  bug-prone-*,
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  -clang-analyzer-alpha*,
+  google-*,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  cppcoreguidelines-*
