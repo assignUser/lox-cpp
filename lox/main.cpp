@@ -95,12 +95,8 @@ int main(int argc, char **argv) {
     print_help();
   }
 
-  tl::expected<int, Error> result;
-  if (filenames.empty()) {
-    result = runPrompt();
-  } else {
-    result = runFile(filenames);
-  }
+  tl::expected<int, Error> result =
+      filenames.empty() ? runPrompt() : runFile(filenames);
 
   if (!result) {
     report(result.error());
