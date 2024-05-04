@@ -20,5 +20,12 @@ CPMAddPackage("gh:TartanLlama/expected@1.1.0")
 CPMAddPackage("gh:TartanLlama/optional@1.1.0")
 CPMAddPackage("gh:fmtlib/fmt#10.2.1")
 CPMAddPackage("gh:bfgroup/Lyra#1.6.1")
+CPMAddPackage(
+  NAME googletest
+  GITHUB_REPOSITORY google/googletest
+  GIT_TAG v1.14.0
+  VERSION 1.14.0
+  OPTIONS "INSTALL_GTEST OFF"
+)
 
 add_subdirectory(lox)
