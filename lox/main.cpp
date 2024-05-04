@@ -25,12 +25,18 @@ std::vector<std::string> read_input(std::istream &input) {
   return input_lines;
 }
 
+void print_help() {
+  fmt::print("lox - An interpreter for lox written in C++\n");
+  fmt::print("Usage:\n{0:4>}lox <file>...\n{0:4>}<stdin> | lox\n", " ");
+  std::exit(0);
+}
+
 int main(int argc, char **argv) {
-  std::string filename{};
+  std::vector<std::string> filenames{};
   bool show_help{false};
 
   auto cli = lyra::cli() | lyra::help(show_help) |
-             lyra::arg(filename, "filename")("Lox file to compile");
+             lyra::arg(filenames, "filename")("Lox file to compile");
 
   if (auto result = cli.parse({argc, argv}); !result) {
     fmt::print(stderr, "Error in commandline: {}\n", result.message());
@@ -38,24 +44,22 @@ int main(int argc, char **argv) {
   }
 
   if (show_help) {
-    fmt::print("lox - An interpreter for lox written in C++\n");
-    fmt::print("Usage:\n\tlox <filename>\n\t<stdin> | lox\n");
-    return 0;
+    print_help();
   }
 
-  std::vector<std::string> input_lines = read_input([&]() -> std::istream & {
-    if (filename.empty()) {
-      return std::cin;
+  auto filename = filenames.at(0);
+  std::vector<std::string> input_lines{};
+  if (filename.empty()) {
+    input_lines = read_input(std::cin);
+  } else {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+      fmt::print(stderr, "Error opening file: {}\n", filename);
+      std::exit(1);
     } else {
-      std::ifstream file(filename);
-      if (!file.is_open()) {
-        fmt::print(stderr, "Error opening file: {}\n", filename);
-        std::exit(1);
-      } else {
-        return file;
-      }
+      input_lines = read_input(file);
     }
-  }());
+  }
 
   fmt::print("{}\n", fmt::join(input_lines, "\n"));
   return 0;
