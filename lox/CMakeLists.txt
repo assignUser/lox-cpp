@@ -6,7 +6,7 @@ configure_target(lox)
 
 target_sources(
   lox
-  PRIVATE main.cpp
+  PRIVATE main.cpp scanner.cpp
 )
 
 target_link_libraries(
@@ -16,3 +16,7 @@ target_link_libraries(
           tl::optional
           bfg::lyra
 )
+
+if(BUILD_TESTING)
+  # add_subdirectory(tests)
+endif()

@@ -10,6 +10,7 @@
 
 #include "fmt/core.h"
 #include "fmt/format.h"
+#include "lox/scanner.hpp"
 #include "lyra/arg.hpp"
 #include "lyra/help.hpp"
 #include "lyra/lyra.hpp"
@@ -49,7 +50,24 @@ tl::expected<int, Error> runFile(std::vector<std::string> const &filenames) {
   return result;
 }
 
-tl::expected<int, Error> runPrompt() { return echo(std::cin); }
+void run(std::string source) {
+  Scanner scanner(source);
+  auto tokens = scanner.scanTokens();
+  fmt::print("{}\n\n", fmt::join(tokens, " "));
+}
+
+tl::expected<int, Error> runPrompt() {
+  while (true) {
+    fmt::print("> ");
+    std::string line;
+    if (not std::getline(std::cin, line)) {
+      break;
+    }
+    run(line);
+  }
+
+  return 0;
+}
 
 void print_help() {
   fmt::print("lox - An interpreter for lox written in C++\n");
@@ -82,8 +100,8 @@ int main(int argc, char **argv) {
     print_help();
   }
 
-  tl::expected<int, Error> result =
-      filenames.empty() ? runPrompt() : runFile(filenames);
+  // auto or full type?
+  auto result{filenames.empty() ? runPrompt() : runFile(filenames)};
 
   if (!result) {
     report(result.error());
