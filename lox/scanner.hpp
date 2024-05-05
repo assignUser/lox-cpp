@@ -82,9 +82,6 @@ public:
     return m_tokens;
   }
 
-  static const std::map<std::string, TokenType> keywords;
-  static const std::map<TokenType, std::string> token_literals;
-
 private:
   void number();
   void scanToken();
@@ -96,6 +93,20 @@ private:
   void addToken(TokenType type) { addToken(type, ""); }
   char advance() { return m_source.at(m_current++); }
   bool atEnd() { return m_current >= m_source.length(); }
+  void identifier() {
+    while (isAlphaNumeric(peek())) {
+      advance();
+    }
+    TokenType type{TokenType::IDENTIFIER};
+
+    auto lexeme = m_source.substr(m_start, m_current - m_start);
+    if (keywords.contains(lexeme)) {
+      type = keywords.at(lexeme);
+    }
+    addToken(type);
+  };
+  bool isAlpha(char c) { return std::isalpha(static_cast<unsigned char>(c)); }
+  bool isAlphaNumeric(char c) { return isDigit(c) or isAlpha(c); }
   bool isDigit(char c) { return std::isdigit(static_cast<unsigned char>(c)); }
   bool match(char expected) {
     if (atEnd() or m_source.at(m_current) != expected) {
@@ -118,7 +129,10 @@ private:
     }
     return m_source.at(m_current + 1);
   }
-
+  
+  friend fmt::formatter<TokenType>;
+  static const std::map<std::string, TokenType> keywords;
+  static const std::map<TokenType, std::string> token_literals;
   int m_start{0};
   int m_current{0};
   int m_line{1};
@@ -142,9 +156,7 @@ template <typename... Ts> struct fmt::formatter<std::variant<Ts...>> {
   constexpr static auto format(std::variant<Ts...> const &value,
                                fmt::format_context &ctx) {
     return std::visit(
-        [&ctx](auto const &v) {
-          return fmt::format_to(ctx.out(), "variant({})", v);
-        },
+        [&ctx](auto const &v) { return fmt::format_to(ctx.out(), "{}", v); },
         value);
   }
 };

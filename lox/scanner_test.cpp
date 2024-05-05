@@ -51,12 +51,44 @@ TEST(ScannerTest, StringLiterals) {
   EXPECT_EQ(unterminated.hasError() ? unterminated.getErrors().at(0).message
                                     : "",
             "Unterminated string.");
-
 }
 
-TEST(ScannerTest, NumberLiterals){
-    fmt::print(stderr, "locale: {}\n", std::locale("").name().c_str());
-    std::locale::global(std::locale(""));
+TEST(ScannerTest, NumberLiterals) {
+  Scanner scanner{"1 42 21.5 0.555 1.123456"};
+  std::vector<double> expected{1, 42, 21.5, 0.555, 1.123456};
+  auto tokens = scanner.scanTokens();
+  // remof EOF token
+  tokens.pop_back();
 
-    EXPECT_TRUE(std::isdigit("²"[0]));
+  EXPECT_FALSE(scanner.hasError());
+  EXPECT_EQ(tokens.size(), expected.size());
+  for (auto i{0}; i < tokens.size(); i++) {
+    EXPECT_EQ(get<double>(tokens.at(i).literal), expected.at(i));
+  }
+}
+
+TEST(ScannerTest, Identifiers) {
+  Scanner scanner{"aVariable = (15)"};
+  auto tokens = scanner.scanTokens();
+
+  EXPECT_FALSE(scanner.hasError());
+  EXPECT_EQ(tokens.at(0).lexeme, "aVariable");
+}
+
+TEST(ScannerTest, Keywords) {
+  Scanner scanner{"if(orchid or ifrit)"};
+  std::vector<TokenType> expected{TokenType::IF,         TokenType::LEFT_PAREN,
+                                  TokenType::IDENTIFIER, TokenType::OR,
+                                  TokenType::IDENTIFIER, TokenType::RIGHT_PAREN,
+                                  TokenType::EoF};
+  auto tokens = scanner.scanTokens();
+
+  EXPECT_FALSE(scanner.hasError());
+  EXPECT_EQ(tokens.size(), expected.size());
+  EXPECT_EQ(tokens.at(2).lexeme, "orchid");
+  EXPECT_EQ(tokens.at(4).lexeme, "ifrit");
+
+  for (auto i{0}; i < tokens.size(); i++) {
+    EXPECT_EQ(tokens.at(i).type, expected.at(i));
+  }
 }

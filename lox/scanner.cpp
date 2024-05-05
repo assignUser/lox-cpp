@@ -171,6 +171,8 @@ void Scanner::scanToken() {
   default:
     if (isDigit(c)) {
       number();
+    } else if (isAlpha(c)) {
+      identifier();
     } else {
       m_errors.emplace_back(
           Error{m_line, "", fmt::format("Unexpected character '{}'.", c)});
