@@ -83,6 +83,24 @@ void Scanner::string() {
            m_source.substr(m_start + 1, m_current - m_start - 2));
 }
 
+void Scanner::blockComment() {
+  while (peek() != '*' and peekNext() != '/' and not atEnd()) {
+    if (peek() == '\n') {
+      m_line++;
+    }
+    advance();
+  }
+
+  if (atEnd()) {
+    m_errors.emplace_back(Error{m_line, "", "Unterminated block comment."});
+    return;
+  }
+
+  // eat the closing '*/'
+  advance();
+  advance();
+}
+
 void Scanner::number() {
   while (isDigit(peek())) {
     advance();
@@ -153,6 +171,8 @@ void Scanner::scanToken() {
       while (peek() != '\n' and not atEnd()) {
         advance();
       }
+    } else if (match('*')) {
+      blockComment();
     } else {
       addToken(TokenType::SLASH);
     }

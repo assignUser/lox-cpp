@@ -92,3 +92,28 @@ TEST(ScannerTest, Keywords) {
     EXPECT_EQ(tokens.at(i).type, expected.at(i));
   }
 }
+
+TEST(ScannerTest, BlockComment) {
+  Scanner scanner{"/*if(orchid \nor ifrit)\n*/ if(orchid or ifrit) // more "
+                  "comments!\n/* single line block comment */ or"};
+  std::vector<TokenType> expected{TokenType::IF,         TokenType::LEFT_PAREN,
+                                  TokenType::IDENTIFIER, TokenType::OR,
+                                  TokenType::IDENTIFIER, TokenType::RIGHT_PAREN,
+                                  TokenType::OR,         TokenType::EoF};
+  auto tokens = scanner.scanTokens();
+
+  EXPECT_FALSE(scanner.hasError());
+  EXPECT_EQ(tokens.size(), expected.size());
+  EXPECT_EQ(tokens.at(2).lexeme, "orchid");
+  EXPECT_EQ(tokens.at(4).lexeme, "ifrit");
+
+  for (auto i{0}; i < tokens.size(); i++) {
+    EXPECT_EQ(tokens.at(i).type, expected.at(i));
+  }
+  Scanner unterminated{"/*This is an unterminated block comment"};
+  auto empty = unterminated.scanTokens();
+  EXPECT_TRUE(unterminated.hasError());
+  EXPECT_EQ(unterminated.hasError() ? unterminated.getErrors().at(0).message
+                                    : "",
+            "Unterminated block comment.");
+}

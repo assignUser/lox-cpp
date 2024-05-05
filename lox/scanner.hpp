@@ -83,9 +83,11 @@ public:
   }
 
 private:
+  void blockComment();
   void number();
   void scanToken();
   void string();
+
   void addToken(TokenType type, std::variant<std::string, double> literal) {
     auto text{m_source.substr(m_start, m_current - m_start)};
     m_tokens.emplace_back(Token(type, text, literal, m_line));
