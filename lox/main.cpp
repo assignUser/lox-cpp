@@ -54,6 +54,12 @@ void run(std::string source) {
   Scanner scanner(source);
   auto tokens = scanner.scanTokens();
   fmt::print("{}\n\n", fmt::join(tokens, " "));
+  if (scanner.hasError()) {
+    for (auto error : scanner.getErrors()) {
+      fmt::print(stderr, "{}\n", error);
+    }
+    std::exit(1);
+  }
 }
 
 tl::expected<int, Error> runPrompt() {

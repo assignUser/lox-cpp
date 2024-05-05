@@ -64,7 +64,7 @@ const std::map<TokenType, std::string> Scanner::token_literals{
     {TokenType::EoF, "EOF"}};
 
 void Scanner::string() {
-  while (peek() != '"' && not atEnd()) {
+  while (peek() != '"' and not atEnd()) {
     if (peek() == '\n') {
       m_line++;
     }
@@ -132,7 +132,7 @@ void Scanner::scanToken() {
   case '/':
     if (match('/')) {
       // A comment goes until the end of the line.
-      while (peek() != '\n' && not atEnd()) {
+      while (peek() != '\n' and not atEnd()) {
         advance();
       }
     } else {

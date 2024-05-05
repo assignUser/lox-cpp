@@ -36,4 +36,11 @@ TEST(ScannerTest, StringLiterals) {
   auto tokens = scanner.scanTokens();
   EXPECT_FALSE(scanner.hasError());
   EXPECT_EQ(tokens.at(0).literal, expected);
+
+  Scanner unterminated{"\"This is an unterminated string."};
+  auto empty = unterminated.scanTokens();
+  EXPECT_TRUE(unterminated.hasError());
+  EXPECT_EQ(unterminated.hasError() ? unterminated.getErrors().at(0).message
+                                    : "",
+            "Unterminated string.");
 }
