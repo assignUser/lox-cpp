@@ -25,6 +25,12 @@ TEST(ScannerTest, MultiCharTokens) {
   for (auto i{0}; i < tokens.size(); i++) {
     EXPECT_EQ(tokens.at(i).type, expected.at(i));
   }
+
+  Scanner unexpected{"!(\n)@"};
+  auto empty = unexpected.scanTokens();
+  EXPECT_TRUE(unexpected.hasError());
+  EXPECT_EQ(unexpected.hasError() ? unexpected.getErrors().at(0).message : "",
+            "Unexpected character '@'.");
 }
 
 TEST(ScannerTest, StringLiterals) {
