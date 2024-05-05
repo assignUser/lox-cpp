@@ -63,6 +63,26 @@ const std::map<TokenType, std::string> Scanner::token_literals{
     {TokenType::WHILE, "while"},
     {TokenType::EoF, "EOF"}};
 
+void Scanner::string() {
+  while (peek() != '"' && not atEnd()) {
+    if (peek() == '\n') {
+      m_line++;
+    }
+    advance();
+  }
+
+  if (atEnd()) {
+    m_errors.emplace_back(Error{m_line, "", "Unterminated string."});
+    return;
+  }
+
+  advance();
+
+  // Trim quotes
+  addToken(TokenType::STRING,
+           m_source.substr(m_start + 1, m_current - m_start - 2));
+}
+
 void Scanner::scanToken() {
   char c{advance()};
 
@@ -124,11 +144,12 @@ void Scanner::scanToken() {
   case '\t':
     // Ignore whitespace.
     break;
-
   case '\n':
     m_line++;
     break;
-
+  case '"':
+    string();
+    break;
   default:
     m_errors.emplace_back(
         Error{m_line, "", fmt::format("Unexpected character '{}'.", c)});

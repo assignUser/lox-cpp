@@ -86,6 +86,7 @@ public:
 
 private:
   void scanToken();
+  void string();
   bool atEnd() { return m_current >= m_source.length(); }
   char advance() { return m_source.at(m_current++); }
   void addToken(TokenType type, std::string literal) {
