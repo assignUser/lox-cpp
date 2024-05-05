@@ -68,7 +68,7 @@ struct Token {
 
 class Scanner {
 public:
-  explicit Scanner(std::string sources) : m_source(std::move(sources)) {}
+  explicit Scanner(std::string sources) : m_source{std::move(sources)} {}
   bool hasError() { return not m_errors.empty(); }
   std::vector<Error> &getErrors() { return m_errors; }
   std::vector<Token> scanTokens() {

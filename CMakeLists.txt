@@ -13,6 +13,12 @@ function(configure_target target)
                CXX_STANDARD_REQUIRED ON
   )
   target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR})
+
+  get_target_property(target_type ${target} TYPE)
+
+  if(NOT target_type STREQUAL "EXECUTABLE")
+    add_library(lox::${target} ALIAS ${target})
+  endif()
 endfunction()
 
 include(cmake/CPM.cmake)
@@ -23,11 +29,18 @@ CPMAddPackage("gh:TartanLlama/optional@1.1.0")
 CPMAddPackage("gh:fmtlib/fmt#10.2.1")
 CPMAddPackage("gh:bfgroup/Lyra#1.6.1")
 CPMAddPackage(
-  NAME googletest
-  GITHUB_REPOSITORY google/googletest
-  GIT_TAG v1.14.0
-  VERSION 1.14.0
-  OPTIONS "INSTALL_GTEST OFF"
+  NAME
+  googletest
+  GITHUB_REPOSITORY
+  google/googletest
+  GIT_TAG
+  v1.14.0
+  VERSION
+  1.14.0
+  OPTIONS
+  "INSTALL_GTEST OFF"
 )
 
+set(BUILD_TESTING ON)
+include(CTest)
 add_subdirectory(lox)
