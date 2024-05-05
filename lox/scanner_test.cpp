@@ -4,6 +4,8 @@
 
 #include "lox/scanner.hpp"
 
+#include <cctype>
+#include <locale>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -35,13 +37,13 @@ TEST(ScannerTest, MultiCharTokens) {
 
 TEST(ScannerTest, StringLiterals) {
   Scanner scanner{
-      "\"This is a string literal and // can contain illegal #@ Symbols\""};
+      "\"This is a string literal and // can\n contain\n illegal #@ Symbols\""};
   std::string expected =
-      "This is a string literal and // can contain illegal #@ Symbols";
+      "This is a string literal and // can\n contain\n illegal #@ Symbols";
 
   auto tokens = scanner.scanTokens();
   EXPECT_FALSE(scanner.hasError());
-  EXPECT_EQ(tokens.at(0).literal, expected);
+  EXPECT_EQ(std::get<std::string>(tokens.at(0).literal), expected);
 
   Scanner unterminated{"\"This is an unterminated string."};
   auto empty = unterminated.scanTokens();
@@ -49,4 +51,12 @@ TEST(ScannerTest, StringLiterals) {
   EXPECT_EQ(unterminated.hasError() ? unterminated.getErrors().at(0).message
                                     : "",
             "Unterminated string.");
+
+}
+
+TEST(ScannerTest, NumberLiterals){
+    fmt::print(stderr, "locale: {}\n", std::locale("").name().c_str());
+    std::locale::global(std::locale(""));
+
+    EXPECT_TRUE(std::isdigit("²"[0]));
 }

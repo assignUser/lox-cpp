@@ -83,6 +83,24 @@ void Scanner::string() {
            m_source.substr(m_start + 1, m_current - m_start - 2));
 }
 
+void Scanner::number() {
+  while (isDigit(peek())) {
+    advance();
+  }
+
+  if (peek() == '.' and isDigit(peekNext())) {
+    // consume '.'
+    advance();
+  }
+
+  while (isDigit(peek())) {
+    advance();
+  }
+
+  addToken(TokenType::NUMBER,
+           std::stod(m_source.substr(m_start, m_current - m_start)));
+}
+
 void Scanner::scanToken() {
   char c{advance()};
 
@@ -151,8 +169,12 @@ void Scanner::scanToken() {
     string();
     break;
   default:
-    m_errors.emplace_back(
-        Error{m_line, "", fmt::format("Unexpected character '{}'.", c)});
+    if (isDigit(c)) {
+      number();
+    } else {
+      m_errors.emplace_back(
+          Error{m_line, "", fmt::format("Unexpected character '{}'.", c)});
+    }
     break;
   }
 }

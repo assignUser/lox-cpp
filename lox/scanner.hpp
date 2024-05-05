@@ -5,6 +5,7 @@
 
 #include <map>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "lox/error.h"
@@ -62,7 +63,7 @@ enum class TokenType {
 struct Token {
   TokenType type{};
   std::string lexeme{};
-  std::string literal{};
+  std::variant<std::string, double> literal{};
   int line{};
 };
 
@@ -85,15 +86,17 @@ public:
   static const std::map<TokenType, std::string> token_literals;
 
 private:
+  void number();
   void scanToken();
   void string();
-  bool atEnd() { return m_current >= m_source.length(); }
-  char advance() { return m_source.at(m_current++); }
-  void addToken(TokenType type, std::string literal) {
-    auto text{m_source.substr(m_start, m_current-m_start)};
+  void addToken(TokenType type, std::variant<std::string, double> literal) {
+    auto text{m_source.substr(m_start, m_current - m_start)};
     m_tokens.emplace_back(Token(type, text, literal, m_line));
   }
   void addToken(TokenType type) { addToken(type, ""); }
+  char advance() { return m_source.at(m_current++); }
+  bool atEnd() { return m_current >= m_source.length(); }
+  bool isDigit(char c) { return std::isdigit(static_cast<unsigned char>(c)); }
   bool match(char expected) {
     if (atEnd() or m_source.at(m_current) != expected) {
       return false;
@@ -109,6 +112,12 @@ private:
 
     return m_source.at(m_current);
   }
+  char peekNext() {
+    if (m_current + 1 >= m_source.size()) {
+      return '\0';
+    }
+    return m_source.at(m_current + 1);
+  }
 
   int m_start{0};
   int m_current{0};
@@ -121,6 +130,22 @@ private:
 template <> struct fmt::formatter<TokenType> : fmt::formatter<std::string> {
   auto format(const TokenType &t, format_context &ctx) const {
     return formatter<std::string>::format(Scanner::token_literals.at(t), ctx);
+  }
+};
+
+template <typename... Ts> struct fmt::formatter<std::variant<Ts...>> {
+  template <typename FormatParseContext>
+  constexpr static auto parse(FormatParseContext &ctx) {
+    return ctx.end();
+  }
+
+  constexpr static auto format(std::variant<Ts...> const &value,
+                               fmt::format_context &ctx) {
+    return std::visit(
+        [&ctx](auto const &v) {
+          return fmt::format_to(ctx.out(), "variant({})", v);
+        },
+        value);
   }
 };
 
