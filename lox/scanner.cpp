@@ -35,7 +35,7 @@ const std::map<TokenType, std::string> Scanner::token_literals{
     {TokenType::SLASH, "/"},
     {TokenType::STAR, "*"},
     {TokenType::BANG, "!"},
-    {TokenType::BANG_EQUAL, "!,"},
+    {TokenType::BANG_EQUAL, "!="},
     {TokenType::EQUAL, "="},
     {TokenType::EQUAL_EQUAL, "=="},
     {TokenType::GREATER, ">"},

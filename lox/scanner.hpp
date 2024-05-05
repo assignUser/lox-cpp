@@ -71,7 +71,7 @@ public:
   explicit Scanner(std::string sources) : m_source{std::move(sources)} {}
   bool hasError() { return not m_errors.empty(); }
   std::vector<Error> &getErrors() { return m_errors; }
-  std::vector<Token> scanTokens() {
+  [[nodiscard]] std::vector<Token> scanTokens() {
     while (not atEnd()) {
       m_start = m_current;
       scanToken();
@@ -89,7 +89,7 @@ private:
   bool atEnd() { return m_current >= m_source.length(); }
   char advance() { return m_source.at(m_current++); }
   void addToken(TokenType type, std::string literal) {
-    auto text{m_source.substr(m_current, m_start)};
+    auto text{m_source.substr(m_start, m_current-m_start)};
     m_tokens.emplace_back(Token(type, text, literal, m_line));
   }
   void addToken(TokenType type) { addToken(type, ""); }
