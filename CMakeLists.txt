@@ -16,6 +16,8 @@ function(configure_target target)
 endfunction()
 
 include(cmake/CPM.cmake)
+set(EXPECTED_BUILD_TESTS OFF)
+set(OPTIONAL_BUILD_TESTS OFF)
 CPMAddPackage("gh:TartanLlama/expected@1.1.0")
 CPMAddPackage("gh:TartanLlama/optional@1.1.0")
 CPMAddPackage("gh:fmtlib/fmt#10.2.1")
