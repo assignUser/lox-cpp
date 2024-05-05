@@ -16,20 +16,7 @@
 #include "tl/expected.hpp"
 #include "tl/optional.hpp"
 
-struct Error {
-
-  int line{};
-  std::string where{};
-  std::string message{};
-};
-
-template <> struct fmt::formatter<Error> : fmt::formatter<std::string> {
-  auto format(const Error &e, format_context &ctx) const {
-    return formatter<std::string>::format(
-        fmt::format("[line {}] Error {}  : {}", e.line, e.where, e.message),
-        ctx);
-  }
-};
+#include "lox/error.h"
 
 void report(Error error) {
   fmt::print(stderr, "{}\n", error);
