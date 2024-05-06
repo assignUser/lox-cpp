@@ -16,7 +16,7 @@ struct Error {
 template <> struct fmt::formatter<Error> : fmt::formatter<std::string> {
   auto format(const Error &e, format_context &ctx) const {
     return formatter<std::string>::format(
-        fmt::format("[line {}] Error {}  : {}", e.line, e.where, e.message),
+        fmt::format("[line {}] Error {} : {}", e.line, e.where, e.message),
         ctx);
   }
 };

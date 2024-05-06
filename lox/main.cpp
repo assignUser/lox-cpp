@@ -19,31 +19,21 @@
 
 #include "lox/error.h"
 
-void report(Error error) {
+[[noreturn]] void report(Error error) {
   fmt::print(stderr, "{}\n", error);
   std::exit(1);
 }
 
-tl::expected<int, Error> echo(std::istream &input) {
-  std::vector<std::string> input_lines{};
-
-  for (std::string line; std::getline(input, line);) {
-    input_lines.push_back(std::move(line));
-  }
-  fmt::print("{}\n\n", fmt::join(input_lines, "\n"));
-
-  return 0;
-}
-
-void run(std::string source) {
+tl::expected<int, Error> run(std::string source) {
   Scanner scanner(source);
   auto tokens = scanner.scanTokens();
   if (scanner.hasError()) {
     for (auto error : scanner.getErrors()) {
       fmt::print(stderr, "{}\n", error);
     }
-    std::exit(1);
+    return tl::unexpected(Error{0, "", "Error while scanning."});
   }
+  return 0;
 }
 
 tl::expected<int, Error> runFile(std::vector<std::string> const &filenames) {
@@ -53,16 +43,10 @@ tl::expected<int, Error> runFile(std::vector<std::string> const &filenames) {
     std::ifstream file(filename);
     if (file.is_open()) {
       fmt::print("Parsing {} ...\n", filename);
-      // std::string source{};
-      // for (std::string line; std::getline(file, line);) {
-      //   source.append(line + "\n");
-      // }
-      // fmt::print("{}END", source);      //
       std::string source((std::istreambuf_iterator<char>(file)),
                          std::istreambuf_iterator<char>());
 
-      run(source);
-      result = 0;
+      result = run(source);
     } else {
       return tl::unexpected(Error(-1, filename, "Error opening file."));
     }
@@ -88,15 +72,6 @@ void print_help() {
   fmt::print("Usage:\n{0:4>}lox <file>...\n{0:4>}<stdin> | lox\n", " ");
   std::exit(0);
 }
-
-class Lox {
-private:
-  bool m_had_error{false};
-  std::vector<std::string> m_filenames{};
-
-public:
-  std::vector<std::string> &filenames() { return m_filenames; }
-};
 
 int main(int argc, char **argv) {
   std::vector<std::string> filenames{};
