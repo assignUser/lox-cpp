@@ -28,7 +28,7 @@ tl::expected<int, Error> echo(std::istream &input) {
   std::vector<std::string> input_lines{};
 
   for (std::string line; std::getline(input, line);) {
-    input_lines.emplace_back(line);
+    input_lines.push_back(std::move(line));
   }
   fmt::print("{}\n\n", fmt::join(input_lines, "\n"));
 

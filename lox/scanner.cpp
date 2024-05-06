@@ -72,7 +72,7 @@ void Scanner::string() {
   }
 
   if (atEnd()) {
-    m_errors.emplace_back(Error{m_line, "", "Unterminated string."});
+    m_errors.emplace_back(m_line, "", "Unterminated string.");
     return;
   }
 
@@ -92,7 +92,7 @@ void Scanner::blockComment() {
   }
 
   if (atEnd()) {
-    m_errors.emplace_back(Error{m_line, "", "Unterminated block comment."});
+    m_errors.emplace_back(m_line, "", "Unterminated block comment.");
     return;
   }
 
@@ -195,7 +195,7 @@ void Scanner::scanToken() {
       identifier();
     } else {
       m_errors.emplace_back(
-          Error{m_line, "", fmt::format("Unexpected character '{}'.", c)});
+          m_line, "", fmt::format("Unexpected character '{}'.", c));
     }
     break;
   }

@@ -78,7 +78,7 @@ public:
       scanToken();
     }
 
-    m_tokens.emplace_back(Token{TokenType::EoF, "", "", m_line});
+    m_tokens.emplace_back(TokenType::EoF, "", "", m_line);
     return m_tokens;
   }
 
@@ -90,7 +90,7 @@ private:
 
   void addToken(TokenType type, std::variant<std::string, double> literal) {
     auto text{m_source.substr(m_start, m_current - m_start)};
-    m_tokens.emplace_back(Token(type, text, literal, m_line));
+    m_tokens.emplace_back(type, text, literal, m_line);
   }
   void addToken(TokenType type) { addToken(type, ""); }
   char advance() { return m_source.at(m_current++); }
