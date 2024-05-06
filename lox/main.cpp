@@ -35,31 +35,39 @@ tl::expected<int, Error> echo(std::istream &input) {
   return 0;
 }
 
-tl::expected<int, Error> runFile(std::vector<std::string> const &filenames) {
-  tl::expected<int, Error> result;
-
-  for (auto const &filename : filenames) {
-    std::ifstream file(filename);
-    if (file.is_open()) {
-      fmt::print("{}:\n", filename);
-      result = echo(file);
-    } else {
-      return tl::unexpected(Error(-1, filename, "Error opening file."));
-    }
-  }
-  return result;
-}
-
 void run(std::string source) {
   Scanner scanner(source);
   auto tokens = scanner.scanTokens();
-  fmt::print("{}\n\n", fmt::join(tokens, " "));
   if (scanner.hasError()) {
     for (auto error : scanner.getErrors()) {
       fmt::print(stderr, "{}\n", error);
     }
     std::exit(1);
   }
+}
+
+tl::expected<int, Error> runFile(std::vector<std::string> const &filenames) {
+  tl::expected<int, Error> result;
+
+  for (auto const &filename : filenames) {
+    std::ifstream file(filename);
+    if (file.is_open()) {
+      fmt::print("Parsing {} ...\n", filename);
+      // std::string source{};
+      // for (std::string line; std::getline(file, line);) {
+      //   source.append(line + "\n");
+      // }
+      // fmt::print("{}END", source);      //
+      std::string source((std::istreambuf_iterator<char>(file)),
+                         std::istreambuf_iterator<char>());
+
+      run(source);
+      result = 0;
+    } else {
+      return tl::unexpected(Error(-1, filename, "Error opening file."));
+    }
+  }
+  return result;
 }
 
 tl::expected<int, Error> runPrompt() {

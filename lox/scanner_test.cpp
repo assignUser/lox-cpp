@@ -94,7 +94,7 @@ TEST(ScannerTest, Keywords) {
 }
 
 TEST(ScannerTest, BlockComment) {
-  Scanner scanner{"/*if(orchid \nor ifrit)\n*/ if(orchid or ifrit) // more "
+  Scanner scanner{"\n  /*if(orchid \nor// \"ifrit)\n*/ if(orchid or ifrit) // more "
                   "comments!\n/* single line block comment */ or"};
   std::vector<TokenType> expected{TokenType::IF,         TokenType::LEFT_PAREN,
                                   TokenType::IDENTIFIER, TokenType::OR,
