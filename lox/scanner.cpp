@@ -84,7 +84,7 @@ void Scanner::string() {
 }
 
 void Scanner::blockComment() {
-  while (peek() != '*' and peekNext() != '/' and not atEnd()) {
+  while (not (peek() == '*' and peekNext() == '/') and not atEnd()) {
     if (peek() == '\n') {
       m_line++;
     }
@@ -194,8 +194,8 @@ void Scanner::scanToken() {
     } else if (isAlpha(c)) {
       identifier();
     } else {
-      m_errors.emplace_back(
-          m_line, "", fmt::format("Unexpected character '{}'.", c));
+      m_errors.emplace_back(m_line, "",
+                            fmt::format("Unexpected character '{}'.", c));
     }
     break;
   }
