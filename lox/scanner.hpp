@@ -70,68 +70,30 @@ struct Token {
 class Scanner {
 public:
   explicit Scanner(std::string sources) : m_source{std::move(sources)} {}
+
+  [[nodiscard]] std::vector<Token> scanTokens();
+
   bool hasError() { return not m_errors.empty(); }
   std::vector<Error> &getErrors() { return m_errors; }
-  [[nodiscard]] std::vector<Token> scanTokens() {
-    while (not atEnd()) {
-      m_start = m_current;
-      scanToken();
-    }
-
-    m_tokens.emplace_back(TokenType::EoF, "", "", m_line);
-    return m_tokens;
-  }
 
 private:
   void blockComment();
+  void identifier();
+  bool match(char expected);
   void number();
+  char peek();
+  char peekNext();
   void scanToken();
   void string();
 
-  void addToken(TokenType type, std::variant<std::string, double> literal) {
-    auto text{m_source.substr(m_start, m_current - m_start)};
-    m_tokens.emplace_back(type, text, literal, m_line);
-  }
+  void addToken(TokenType type, std::variant<std::string, double> literal);
   void addToken(TokenType type) { addToken(type, ""); }
   char advance() { return m_source.at(m_current++); }
   bool atEnd() { return m_current >= m_source.length(); }
-  void identifier() {
-    while (isAlphaNumeric(peek())) {
-      advance();
-    }
-    TokenType type{TokenType::IDENTIFIER};
-
-    auto lexeme = m_source.substr(m_start, m_current - m_start);
-    if (keywords.contains(lexeme)) {
-      type = keywords.at(lexeme);
-    }
-    addToken(type);
-  };
   bool isAlpha(char c) { return std::isalpha(static_cast<unsigned char>(c)); }
   bool isAlphaNumeric(char c) { return isDigit(c) or isAlpha(c); }
   bool isDigit(char c) { return std::isdigit(static_cast<unsigned char>(c)); }
-  bool match(char expected) {
-    if (atEnd() or m_source.at(m_current) != expected) {
-      return false;
-    }
 
-    m_current++;
-    return true;
-  }
-  char peek() {
-    if (atEnd()) {
-      return '\0';
-    }
-
-    return m_source.at(m_current);
-  }
-  char peekNext() {
-    if (m_current + 1 >= m_source.size()) {
-      return '\0';
-    }
-    return m_source.at(m_current + 1);
-  }
-  
   friend fmt::formatter<TokenType>;
   static const std::map<std::string, TokenType> keywords;
   static const std::map<TokenType, std::string> token_literals;

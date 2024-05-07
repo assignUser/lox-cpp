@@ -12,56 +12,94 @@
 
 #include "lox/error.h"
 
-const std::map<std::string, TokenType> Scanner::keywords{
-    {"and", TokenType::AND},       {"class", TokenType::CLASS},
-    {"else", TokenType::ELSE},     {"false", TokenType::FALSE},
-    {"fun", TokenType::FUN},       {"for", TokenType::FOR},
-    {"if", TokenType::IF},         {"nil", TokenType::NIL},
-    {"or", TokenType::OR},         {"print", TokenType::PRINT},
-    {"return", TokenType::RETURN}, {"super", TokenType::SUPER},
-    {"this", TokenType::THIS},     {"true", TokenType::TRUE},
-    {"var", TokenType::VAR},       {"while", TokenType::WHILE}};
+void Scanner::addToken(TokenType type,
+                       std::variant<std::string, double> literal) {
+  auto text{m_source.substr(m_start, m_current - m_start)};
+  m_tokens.emplace_back(type, text, literal, m_line);
+}
 
-const std::map<TokenType, std::string> Scanner::token_literals{
-    {TokenType::LEFT_PAREN, "("},
-    {TokenType::RIGHT_PAREN, ")"},
-    {TokenType::LEFT_BRACE, "{TokenType::"},
-    {TokenType::RIGHT_BRACE, "}"},
-    {TokenType::COMMA, ","},
-    {TokenType::DOT, "."},
-    {TokenType::MINUS, "-"},
-    {TokenType::PLUS, "+"},
-    {TokenType::SEMICOLON, ";"},
-    {TokenType::SLASH, "/"},
-    {TokenType::STAR, "*"},
-    {TokenType::BANG, "!"},
-    {TokenType::BANG_EQUAL, "!="},
-    {TokenType::EQUAL, "="},
-    {TokenType::EQUAL_EQUAL, "=="},
-    {TokenType::GREATER, ">"},
-    {TokenType::GREATER_EQUAL, ">="},
-    {TokenType::LESS, "<"},
-    {TokenType::LESS_EQUAL, "<="},
-    {TokenType::IDENTIFIER, "Identifier"},
-    {TokenType::STRING, "String"},
-    {TokenType::NUMBER, "Number"},
-    {TokenType::AND, "and"},
-    {TokenType::CLASS, "class"},
-    {TokenType::ELSE, "else"},
-    {TokenType::FALSE, "false"},
-    {TokenType::FUN, "fun"},
-    {TokenType::FOR, "for"},
-    {TokenType::IF, "if"},
-    {TokenType::NIL, "nil"},
-    {TokenType::OR, "or"},
-    {TokenType::PRINT, "print"},
-    {TokenType::RETURN, "return"},
-    {TokenType::SUPER, "super"},
-    {TokenType::THIS, "this"},
-    {TokenType::TRUE, "true"},
-    {TokenType::VAR, "var"},
-    {TokenType::WHILE, "while"},
-    {TokenType::EoF, "EOF"}};
+void Scanner::blockComment() {
+  while (not(peek() == '*' and peekNext() == '/') and not atEnd()) {
+    if (peek() == '\n') {
+      m_line++;
+    }
+    advance();
+  }
+
+  if (atEnd()) {
+    m_errors.emplace_back(m_line, "", "Unterminated block comment.");
+    return;
+  }
+
+  // eat the closing '*/'
+  advance();
+  advance();
+}
+
+void Scanner::identifier() {
+  while (isAlphaNumeric(peek())) {
+    advance();
+  }
+  TokenType type{TokenType::IDENTIFIER};
+
+  std::string lexeme = m_source.substr(m_start, m_current - m_start);
+  if (keywords.contains(lexeme)) {
+    type = keywords.at(lexeme);
+  }
+  addToken(type);
+}
+
+bool Scanner::match(char expected) {
+  if (atEnd() or m_source.at(m_current) != expected) {
+    return false;
+  }
+
+  m_current++;
+  return true;
+}
+
+void Scanner::number() {
+  while (isDigit(peek())) {
+    advance();
+  }
+
+  if (peek() == '.' and isDigit(peekNext())) {
+    // consume '.'
+    advance();
+  }
+
+  while (isDigit(peek())) {
+    advance();
+  }
+
+  addToken(TokenType::NUMBER,
+           std::stod(m_source.substr(m_start, m_current - m_start)));
+}
+
+char Scanner::peek() {
+  if (atEnd()) {
+    return '\0';
+  }
+
+  return m_source.at(m_current);
+}
+
+char Scanner::peekNext() {
+  if (m_current + 1 >= m_source.size()) {
+    return '\0';
+  }
+  return m_source.at(m_current + 1);
+}
+
+[[nodiscard]] std::vector<Token> Scanner::scanTokens() {
+  while (not atEnd()) {
+    m_start = m_current;
+    scanToken();
+  }
+
+  m_tokens.emplace_back(TokenType::EoF, "", "", m_line);
+  return m_tokens;
+}
 
 void Scanner::string() {
   while (peek() != '"' and not atEnd()) {
@@ -81,42 +119,6 @@ void Scanner::string() {
   // Trim quotes
   addToken(TokenType::STRING,
            m_source.substr(m_start + 1, m_current - m_start - 2));
-}
-
-void Scanner::blockComment() {
-  while (not (peek() == '*' and peekNext() == '/') and not atEnd()) {
-    if (peek() == '\n') {
-      m_line++;
-    }
-    advance();
-  }
-
-  if (atEnd()) {
-    m_errors.emplace_back(m_line, "", "Unterminated block comment.");
-    return;
-  }
-
-  // eat the closing '*/'
-  advance();
-  advance();
-}
-
-void Scanner::number() {
-  while (isDigit(peek())) {
-    advance();
-  }
-
-  if (peek() == '.' and isDigit(peekNext())) {
-    // consume '.'
-    advance();
-  }
-
-  while (isDigit(peek())) {
-    advance();
-  }
-
-  addToken(TokenType::NUMBER,
-           std::stod(m_source.substr(m_start, m_current - m_start)));
 }
 
 void Scanner::scanToken() {
@@ -200,3 +202,54 @@ void Scanner::scanToken() {
     break;
   }
 }
+
+const std::map<std::string, TokenType> Scanner::keywords{
+    {"and", TokenType::AND},       {"class", TokenType::CLASS},
+    {"else", TokenType::ELSE},     {"false", TokenType::FALSE},
+    {"fun", TokenType::FUN},       {"for", TokenType::FOR},
+    {"if", TokenType::IF},         {"nil", TokenType::NIL},
+    {"or", TokenType::OR},         {"print", TokenType::PRINT},
+    {"return", TokenType::RETURN}, {"super", TokenType::SUPER},
+    {"this", TokenType::THIS},     {"true", TokenType::TRUE},
+    {"var", TokenType::VAR},       {"while", TokenType::WHILE}};
+
+const std::map<TokenType, std::string> Scanner::token_literals{
+    {TokenType::LEFT_PAREN, "("},
+    {TokenType::RIGHT_PAREN, ")"},
+    {TokenType::LEFT_BRACE, "{TokenType::"},
+    {TokenType::RIGHT_BRACE, "}"},
+    {TokenType::COMMA, ","},
+    {TokenType::DOT, "."},
+    {TokenType::MINUS, "-"},
+    {TokenType::PLUS, "+"},
+    {TokenType::SEMICOLON, ";"},
+    {TokenType::SLASH, "/"},
+    {TokenType::STAR, "*"},
+    {TokenType::BANG, "!"},
+    {TokenType::BANG_EQUAL, "!="},
+    {TokenType::EQUAL, "="},
+    {TokenType::EQUAL_EQUAL, "=="},
+    {TokenType::GREATER, ">"},
+    {TokenType::GREATER_EQUAL, ">="},
+    {TokenType::LESS, "<"},
+    {TokenType::LESS_EQUAL, "<="},
+    {TokenType::IDENTIFIER, "Identifier"},
+    {TokenType::STRING, "String"},
+    {TokenType::NUMBER, "Number"},
+    {TokenType::AND, "and"},
+    {TokenType::CLASS, "class"},
+    {TokenType::ELSE, "else"},
+    {TokenType::FALSE, "false"},
+    {TokenType::FUN, "fun"},
+    {TokenType::FOR, "for"},
+    {TokenType::IF, "if"},
+    {TokenType::NIL, "nil"},
+    {TokenType::OR, "or"},
+    {TokenType::PRINT, "print"},
+    {TokenType::RETURN, "return"},
+    {TokenType::SUPER, "super"},
+    {TokenType::THIS, "this"},
+    {TokenType::TRUE, "true"},
+    {TokenType::VAR, "var"},
+    {TokenType::WHILE, "while"},
+    {TokenType::EoF, "EOF"}};
