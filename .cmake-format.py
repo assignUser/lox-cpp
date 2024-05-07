@@ -18,5 +18,6 @@ with section("format"):
     always_wrap = ["set_target_properties", "target_sources", "target_link_libraries"]
 
 with section("markup"):
+    disable = True
     # Prevent formatting of license header
     first_comment_is_literal = True
