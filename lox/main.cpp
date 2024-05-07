@@ -67,7 +67,7 @@ tl::expected<int, Error> runPrompt() {
   return 0;
 }
 
-void print_help() {
+[[noreturn]] void print_help() {
   fmt::print("lox - An interpreter for lox written in C++\n");
   fmt::print("Usage:\n{0:4>}lox <file>...\n{0:4>}<stdin> | lox\n", " ");
   std::exit(0);
@@ -77,8 +77,8 @@ int main(int argc, char **argv) {
   std::vector<std::string> filenames{};
   bool show_help{false};
 
-  auto cli = lyra::cli() | lyra::help(show_help) |
-             lyra::arg(filenames, "filename")("Lox file to compile");
+  lyra::cli cli = lyra::cli() | lyra::help(show_help) |
+                  lyra::arg(filenames, "filename")("Lox file to compile");
 
   if (auto result = cli.parse({argc, argv}); !result) {
     fmt::print(stderr, "Error in commandline: {}\n", result.message());
@@ -89,8 +89,7 @@ int main(int argc, char **argv) {
     print_help();
   }
 
-  // auto or full type?
-  auto result{filenames.empty() ? runPrompt() : runFile(filenames)};
+  tl::expected result{filenames.empty() ? runPrompt() : runFile(filenames)};
 
   if (!result) {
     report(result.error());

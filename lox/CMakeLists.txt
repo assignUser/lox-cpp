@@ -34,8 +34,7 @@ if(BUILD_TESTING)
   add_executable(scanner_test scanner_test.cpp)
   configure_target(scanner_test)
 
-  target_link_libraries(scanner_test PRIVATE lox::scanner gtest_main)
+  target_link_libraries(scanner_test PRIVATE lox::scanner  Catch2::Catch2WithMain)
 
-  include(GoogleTest)
-  gtest_discover_tests(scanner_test)
+  catch_discover_tests(scanner_test EXTRA_ARGS -b)
 endif()
