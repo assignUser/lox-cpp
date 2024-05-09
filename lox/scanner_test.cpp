@@ -13,11 +13,11 @@
 TEST_CASE("Multichar tokens are lexed correctly", "[scanner]") {
   Scanner scanner{
       "! != =  == <= <\n> >= / // A comment so I can write anything! ###"};
-  std::vector<TokenType> expected{
-      TokenType::BANG,        TokenType::BANG_EQUAL,    TokenType::EQUAL,
-      TokenType::EQUAL_EQUAL, TokenType::LESS_EQUAL,    TokenType::LESS,
-      TokenType::GREATER,     TokenType::GREATER_EQUAL, TokenType::SLASH,
-      TokenType::EoF};
+  std::vector<Token::Type> expected{
+      Token::Type::BANG,        Token::Type::BANG_EQUAL,    Token::Type::EQUAL,
+      Token::Type::EQUAL_EQUAL, Token::Type::LESS_EQUAL,    Token::Type::LESS,
+      Token::Type::GREATER,     Token::Type::GREATER_EQUAL, Token::Type::SLASH,
+      Token::Type::END_OF_FILE};
 
   std::vector tokens = scanner.scanTokens();
   REQUIRE(not scanner.hasError());
@@ -80,10 +80,10 @@ TEST_CASE("Identifiers", "[scanner]") {
 
 TEST_CASE("Keywords", "[scanner]") {
   Scanner scanner{"if(orchid or ifrit)"};
-  std::vector<TokenType> expected{TokenType::IF,         TokenType::LEFT_PAREN,
-                                  TokenType::IDENTIFIER, TokenType::OR,
-                                  TokenType::IDENTIFIER, TokenType::RIGHT_PAREN,
-                                  TokenType::EoF};
+  std::vector<Token::Type> expected{Token::Type::IF,         Token::Type::LEFT_PAREN,
+                                  Token::Type::IDENTIFIER, Token::Type::OR,
+                                  Token::Type::IDENTIFIER, Token::Type::RIGHT_PAREN,
+                                  Token::Type::END_OF_FILE};
   auto tokens = scanner.scanTokens();
 
   REQUIRE(not scanner.hasError());
@@ -100,10 +100,10 @@ TEST_CASE("Multi-line block comments work", "[scanner]") {
   Scanner scanner{
       "\n  /*if(orchid \nor// \"ifrit)\n*/ if(orchid or ifrit) // more "
       "comments!\n/* single line block comment */ or"};
-  std::vector<TokenType> expected{TokenType::IF,         TokenType::LEFT_PAREN,
-                                  TokenType::IDENTIFIER, TokenType::OR,
-                                  TokenType::IDENTIFIER, TokenType::RIGHT_PAREN,
-                                  TokenType::OR,         TokenType::EoF};
+  std::vector<Token::Type> expected{Token::Type::IF,         Token::Type::LEFT_PAREN,
+                                  Token::Type::IDENTIFIER, Token::Type::OR,
+                                  Token::Type::IDENTIFIER, Token::Type::RIGHT_PAREN,
+                                  Token::Type::OR,         Token::Type::END_OF_FILE};
   auto tokens = scanner.scanTokens();
 
   REQUIRE(not scanner.hasError());

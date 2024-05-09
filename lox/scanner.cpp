@@ -3,16 +3,10 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include "lox/scanner.hpp"
 
-#include <map>
-#include <string>
-
-#include <fmt/core.h>
 #include <fmt/format.h>
-#include <vector>
 
-#include "lox/error.h"
 
-void Scanner::addToken(TokenType type,
+void Scanner::addToken(Token::Type type,
                        std::variant<std::string, double> literal) {
   auto text{m_source.substr(m_start, m_current - m_start)};
   m_tokens.emplace_back(type, text, literal, m_line);
@@ -40,11 +34,11 @@ void Scanner::identifier() {
   while (isAlphaNumeric(peek())) {
     advance();
   }
-  TokenType type{TokenType::IDENTIFIER};
+  Token::Type type{Token::Type::IDENTIFIER};
 
   std::string lexeme = m_source.substr(m_start, m_current - m_start);
-  if (keywords.contains(lexeme)) {
-    type = keywords.at(lexeme);
+  if (Token::keywords.contains(lexeme)) {
+    type = Token::keywords.at(lexeme);
   }
   addToken(type);
 }
@@ -72,7 +66,7 @@ void Scanner::number() {
     advance();
   }
 
-  addToken(TokenType::NUMBER,
+  addToken(Token::Type::NUMBER,
            std::stod(m_source.substr(m_start, m_current - m_start)));
 }
 
@@ -97,7 +91,7 @@ char Scanner::peekNext() {
     scanToken();
   }
 
-  m_tokens.emplace_back(TokenType::EoF, "", "", m_line);
+  m_tokens.emplace_back(Token::Type::END_OF_FILE, "", "", m_line);
   return m_tokens;
 }
 
@@ -117,7 +111,7 @@ void Scanner::string() {
   advance();
 
   // Trim quotes
-  addToken(TokenType::STRING,
+  addToken(Token::Type::STRING,
            m_source.substr(m_start + 1, m_current - m_start - 2));
 }
 
@@ -126,46 +120,46 @@ void Scanner::scanToken() {
 
   switch (c) {
   case '(':
-    addToken(TokenType::LEFT_PAREN);
+    addToken(Token::Type::LEFT_PAREN);
     break;
   case ')':
-    addToken(TokenType::RIGHT_PAREN);
+    addToken(Token::Type::RIGHT_PAREN);
     break;
   case '{':
-    addToken(TokenType::LEFT_BRACE);
+    addToken(Token::Type::LEFT_BRACE);
     break;
   case '}':
-    addToken(TokenType::RIGHT_BRACE);
+    addToken(Token::Type::RIGHT_BRACE);
     break;
   case ',':
-    addToken(TokenType::COMMA);
+    addToken(Token::Type::COMMA);
     break;
   case '.':
-    addToken(TokenType::DOT);
+    addToken(Token::Type::DOT);
     break;
   case '-':
-    addToken(TokenType::MINUS);
+    addToken(Token::Type::MINUS);
     break;
   case '+':
-    addToken(TokenType::PLUS);
+    addToken(Token::Type::PLUS);
     break;
   case ';':
-    addToken(TokenType::SEMICOLON);
+    addToken(Token::Type::SEMICOLON);
     break;
   case '*':
-    addToken(TokenType::STAR);
+    addToken(Token::Type::STAR);
     break;
   case '!':
-    addToken(match('=') ? TokenType::BANG_EQUAL : TokenType::BANG);
+    addToken(match('=') ? Token::Type::BANG_EQUAL : Token::Type::BANG);
     break;
   case '=':
-    addToken(match('=') ? TokenType::EQUAL_EQUAL : TokenType::EQUAL);
+    addToken(match('=') ? Token::Type::EQUAL_EQUAL : Token::Type::EQUAL);
     break;
   case '<':
-    addToken(match('=') ? TokenType::LESS_EQUAL : TokenType::LESS);
+    addToken(match('=') ? Token::Type::LESS_EQUAL : Token::Type::LESS);
     break;
   case '>':
-    addToken(match('=') ? TokenType::GREATER_EQUAL : TokenType::GREATER);
+    addToken(match('=') ? Token::Type::GREATER_EQUAL : Token::Type::GREATER);
     break;
   case '/':
     if (match('/')) {
@@ -176,7 +170,7 @@ void Scanner::scanToken() {
     } else if (match('*')) {
       blockComment();
     } else {
-      addToken(TokenType::SLASH);
+      addToken(Token::Type::SLASH);
     }
     break;
   case ' ':
@@ -203,53 +197,53 @@ void Scanner::scanToken() {
   }
 }
 
-const std::map<std::string, TokenType> Scanner::keywords{
-    {"and", TokenType::AND},       {"class", TokenType::CLASS},
-    {"else", TokenType::ELSE},     {"false", TokenType::FALSE},
-    {"fun", TokenType::FUN},       {"for", TokenType::FOR},
-    {"if", TokenType::IF},         {"nil", TokenType::NIL},
-    {"or", TokenType::OR},         {"print", TokenType::PRINT},
-    {"return", TokenType::RETURN}, {"super", TokenType::SUPER},
-    {"this", TokenType::THIS},     {"true", TokenType::TRUE},
-    {"var", TokenType::VAR},       {"while", TokenType::WHILE}};
+const std::map<std::string_view, Token::Type> Token::keywords{
+    {"and", Token::Type::AND},       {"class", Token::Type::CLASS},
+    {"else", Token::Type::ELSE},     {"false", Token::Type::FALSE},
+    {"fun", Token::Type::FUN},       {"for", Token::Type::FOR},
+    {"if", Token::Type::IF},         {"nil", Token::Type::NIL},
+    {"or", Token::Type::OR},         {"print", Token::Type::PRINT},
+    {"return", Token::Type::RETURN}, {"super", Token::Type::SUPER},
+    {"this", Token::Type::THIS},     {"true", Token::Type::TRUE},
+    {"var", Token::Type::VAR},       {"while", Token::Type::WHILE}};
 
-const std::map<TokenType, std::string> Scanner::token_literals{
-    {TokenType::LEFT_PAREN, "("},
-    {TokenType::RIGHT_PAREN, ")"},
-    {TokenType::LEFT_BRACE, "{TokenType::"},
-    {TokenType::RIGHT_BRACE, "}"},
-    {TokenType::COMMA, ","},
-    {TokenType::DOT, "."},
-    {TokenType::MINUS, "-"},
-    {TokenType::PLUS, "+"},
-    {TokenType::SEMICOLON, ";"},
-    {TokenType::SLASH, "/"},
-    {TokenType::STAR, "*"},
-    {TokenType::BANG, "!"},
-    {TokenType::BANG_EQUAL, "!="},
-    {TokenType::EQUAL, "="},
-    {TokenType::EQUAL_EQUAL, "=="},
-    {TokenType::GREATER, ">"},
-    {TokenType::GREATER_EQUAL, ">="},
-    {TokenType::LESS, "<"},
-    {TokenType::LESS_EQUAL, "<="},
-    {TokenType::IDENTIFIER, "Identifier"},
-    {TokenType::STRING, "String"},
-    {TokenType::NUMBER, "Number"},
-    {TokenType::AND, "and"},
-    {TokenType::CLASS, "class"},
-    {TokenType::ELSE, "else"},
-    {TokenType::FALSE, "false"},
-    {TokenType::FUN, "fun"},
-    {TokenType::FOR, "for"},
-    {TokenType::IF, "if"},
-    {TokenType::NIL, "nil"},
-    {TokenType::OR, "or"},
-    {TokenType::PRINT, "print"},
-    {TokenType::RETURN, "return"},
-    {TokenType::SUPER, "super"},
-    {TokenType::THIS, "this"},
-    {TokenType::TRUE, "true"},
-    {TokenType::VAR, "var"},
-    {TokenType::WHILE, "while"},
-    {TokenType::EoF, "EOF"}};
+const std::map<Token::Type, std::string_view> Token::token_literals{
+    {Token::Type::LEFT_PAREN, "("},
+    {Token::Type::RIGHT_PAREN, ")"},
+    {Token::Type::LEFT_BRACE, "{Token::Type::"},
+    {Token::Type::RIGHT_BRACE, "}"},
+    {Token::Type::COMMA, ","},
+    {Token::Type::DOT, "."},
+    {Token::Type::MINUS, "-"},
+    {Token::Type::PLUS, "+"},
+    {Token::Type::SEMICOLON, ";"},
+    {Token::Type::SLASH, "/"},
+    {Token::Type::STAR, "*"},
+    {Token::Type::BANG, "!"},
+    {Token::Type::BANG_EQUAL, "!="},
+    {Token::Type::EQUAL, "="},
+    {Token::Type::EQUAL_EQUAL, "=="},
+    {Token::Type::GREATER, ">"},
+    {Token::Type::GREATER_EQUAL, ">="},
+    {Token::Type::LESS, "<"},
+    {Token::Type::LESS_EQUAL, "<="},
+    {Token::Type::IDENTIFIER, "Identifier"},
+    {Token::Type::STRING, "String"},
+    {Token::Type::NUMBER, "Number"},
+    {Token::Type::AND, "and"},
+    {Token::Type::CLASS, "class"},
+    {Token::Type::ELSE, "else"},
+    {Token::Type::FALSE, "false"},
+    {Token::Type::FUN, "fun"},
+    {Token::Type::FOR, "for"},
+    {Token::Type::IF, "if"},
+    {Token::Type::NIL, "nil"},
+    {Token::Type::OR, "or"},
+    {Token::Type::PRINT, "print"},
+    {Token::Type::RETURN, "return"},
+    {Token::Type::SUPER, "super"},
+    {Token::Type::THIS, "this"},
+    {Token::Type::TRUE, "true"},
+    {Token::Type::VAR, "var"},
+    {Token::Type::WHILE, "while"},
+    {Token::Type::END_OF_FILE, "END_OF_FILE"}};

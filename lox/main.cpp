@@ -10,22 +10,22 @@
 
 #include "fmt/core.h"
 #include "fmt/format.h"
-#include "lox/scanner.hpp"
 #include "lyra/arg.hpp"
 #include "lyra/help.hpp"
 #include "lyra/lyra.hpp"
 #include "tl/expected.hpp"
 #include "tl/optional.hpp"
 
-#include "lox/error.h"
+#include "lox/error.hpp"
+#include "lox/scanner.hpp"
 
-[[noreturn]] void report(Error error) {
+[[noreturn]] void report(Error const &error) {
   fmt::print(stderr, "{}\n", error);
   std::exit(1);
 }
 
-tl::expected<int, Error> run(std::string source) {
-  Scanner scanner(source);
+tl::expected<int, Error> run(std::string_view source) {
+  Scanner scanner{source};
   auto tokens = scanner.scanTokens();
   if (scanner.hasError()) {
     for (auto error : scanner.getErrors()) {

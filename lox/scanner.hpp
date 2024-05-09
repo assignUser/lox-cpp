@@ -8,68 +8,12 @@
 #include <variant>
 #include <vector>
 
-#include "lox/error.h"
-
-enum class TokenType {
-  // Single-character tokens.
-  LEFT_PAREN,
-  RIGHT_PAREN,
-  LEFT_BRACE,
-  RIGHT_BRACE,
-  COMMA,
-  DOT,
-  MINUS,
-  PLUS,
-  SEMICOLON,
-  SLASH,
-  STAR,
-
-  // One or two character tokens.
-  BANG,
-  BANG_EQUAL,
-  EQUAL,
-  EQUAL_EQUAL,
-  GREATER,
-  GREATER_EQUAL,
-  LESS,
-  LESS_EQUAL,
-
-  // Literals.
-  IDENTIFIER,
-  STRING,
-  NUMBER,
-
-  // Keywords.
-  AND,
-  CLASS,
-  ELSE,
-  FALSE,
-  FUN,
-  FOR,
-  IF,
-  NIL,
-  OR,
-  PRINT,
-  RETURN,
-  SUPER,
-  THIS,
-  TRUE,
-  VAR,
-  WHILE,
-
-  EoF // EOF is a macro
-};
-
-struct Token {
-  TokenType type{};
-  std::string lexeme{};
-  std::variant<std::string, double> literal{};
-  int line{};
-};
+#include "lox/error.hpp"
+#include "lox/token.hpp"
 
 class Scanner {
 public:
-  explicit Scanner(std::string sources) : m_source{std::move(sources)} {}
+  explicit Scanner(std::string_view sources) : m_source{sources} {}
 
   [[nodiscard]] std::vector<Token> scanTokens();
 
@@ -86,17 +30,14 @@ private:
   void scanToken();
   void string();
 
-  void addToken(TokenType type, std::variant<std::string, double> literal);
-  void addToken(TokenType type) { addToken(type, ""); }
+  void addToken(Token::Type type, std::variant<std::string, double> literal);
+  void addToken(Token::Type type) { addToken(type, ""); }
   char advance() { return m_source.at(m_current++); }
   bool atEnd() { return m_current >= m_source.length(); }
   bool isAlpha(char c) { return std::isalpha(static_cast<unsigned char>(c)); }
   bool isAlphaNumeric(char c) { return isDigit(c) or isAlpha(c); }
   bool isDigit(char c) { return std::isdigit(static_cast<unsigned char>(c)); }
 
-  friend fmt::formatter<TokenType>;
-  static const std::map<std::string, TokenType> keywords;
-  static const std::map<TokenType, std::string> token_literals;
   int m_start{0};
   int m_current{0};
   int m_line{1};
@@ -105,9 +46,11 @@ private:
   std::vector<Error> m_errors{};
 };
 
-template <> struct fmt::formatter<TokenType> : fmt::formatter<std::string> {
-  auto format(const TokenType &t, format_context &ctx) const {
-    return formatter<std::string>::format(Scanner::token_literals.at(t), ctx);
+template <>
+struct fmt::formatter<Token::Type> : fmt::formatter<std::string_view> {
+  auto format(const Token::Type &t, format_context &ctx) const {
+    return formatter<std::string_view>::format(Token::token_literals.at(t),
+                                               ctx);
   }
 };
 
