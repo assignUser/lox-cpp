@@ -6,8 +6,9 @@
 #include <string>
 
 #include <fmt/format.h>
+#include <vector>
 
-struct Error {
+struct [[nodiscard]] Error {
   int line{};
   std::string where{};
   std::string message{};

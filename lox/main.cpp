@@ -3,18 +3,15 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include <fstream>
 #include <numeric>
-#include <optional>
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include "fmt/core.h"
-#include "fmt/format.h"
 #include "lyra/arg.hpp"
 #include "lyra/help.hpp"
-#include "lyra/lyra.hpp"
+#include "lyra/cli.hpp"
 #include "tl/expected.hpp"
-#include "tl/optional.hpp"
 
 #include "lox/error.hpp"
 #include "lox/scanner.hpp"
@@ -26,7 +23,7 @@
 
 tl::expected<int, Error> run(std::string_view source) {
   Scanner scanner{source};
-  auto tokens = scanner.scanTokens();
+  std::vector tokens = scanner.scanTokens();
   if (scanner.hasError()) {
     for (auto error : scanner.getErrors()) {
       fmt::print(stderr, "{}\n", error);
