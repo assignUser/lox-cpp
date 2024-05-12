@@ -19,15 +19,27 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: "/tmp/.ccache"
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt install ninja-build
 
+      - uses: assignUser/stash/restore@v1
+        with:
+          path: '${{ env.CCACHE_DIR }}'
+          key: ccache-linux
+
       - name: Configure
-        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_COLOR_DIAGNOSTICS=ON 
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_COLOR_DIAGNOSTICS=ON
 
       - name: Build
         run: cmake --build build
+
+      - uses: assignUser/stash/save@v1
+        with:
+          path: '${{ env.CCACHE_DIR }}'
+          key: ccache-linux
 
       - name: Run tests
         working-directory: build

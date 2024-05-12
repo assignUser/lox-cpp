@@ -70,6 +70,19 @@
 			]
 		},
 		{
+			"name": "ci",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "default"
+				},
+				{
+					"type": "build",
+					"name": "default"
+				}
+			]
+		},
+		{
 			"name": "clean",
 			"steps": [
 				{
