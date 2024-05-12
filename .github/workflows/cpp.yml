@@ -22,7 +22,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt install ninja-build
+
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_COLOR_DIAGNOSTICS=ON 
+
       - name: Build
-        run: cmake --workflow --preset ci-build
+        run: cmake --build build
+
       - name: Run tests
-        run: cmake --workflow --preset ci-test
+        working-directory: build
+        run: ctest -j4 --output-on-failure --no-tests=error
