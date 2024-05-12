@@ -3,8 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include "lox/scanner.hpp"
 
+#include <charconv>
 #include <fmt/format.h>
-
+#include <stdexcept>
 
 void Scanner::addToken(Token::Type type,
                        std::variant<std::string, double> literal) {
@@ -66,8 +67,22 @@ void Scanner::number() {
     advance();
   }
 
-  addToken(Token::Type::NUMBER,
-           std::stod(m_source.substr(m_start, m_current - m_start)));
+  double number{};
+  auto [ptr, ec] = std::from_chars(m_source.data() + m_start,
+                                   m_source.data() + m_current, number);
+  if (ec == std::errc()) {
+    addToken(Token::Type::NUMBER, number);
+  } else if (ec == std::errc::invalid_argument) {
+    throw std::invalid_argument(
+        fmt::format("Error during lexing of number literal in line {}!\nThis "
+                    "number is not a number!",
+                    m_line));
+  } else if (ec == std::errc::result_out_of_range) {
+    throw std::overflow_error(
+        fmt::format("Error during lexing of number literal in line {}!\nThis "
+                    "number is larger than a double!",
+                    m_line));
+  }
 }
 
 char Scanner::peek() {
