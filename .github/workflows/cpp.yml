@@ -22,5 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt install ninja-build
-      - name: Build and test
-        run: cmake --workflow --preset default
+      - name: Build
+        run: cmake --workflow --preset ci-build
+      - name: Run tests
+        run: cmake --workflow --preset ci-test

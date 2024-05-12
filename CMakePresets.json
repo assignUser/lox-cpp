@@ -20,6 +20,18 @@
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
 				"CMAKE_COLOR_DIAGNOSTICS": "YES"
 			}
+		},
+		{
+			"name": "ci",
+			"displayName": "Ninja Release with Debug Info",
+			"description": "Use Ninja to build the project with optimizations and debug info.",
+			"generator": "Ninja",
+			"hidden": false,
+			"binaryDir": "${sourceDir}/build",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
+				"CMAKE_COLOR_DIAGNOSTICS": "YES"
+			}
 		}
 	],
 	"buildPresets": [
@@ -52,6 +64,28 @@
 		}
 	],
 	"workflowPresets": [
+		{
+			"name": "ci-build",
+			"steps": [
+				{
+					"type": "configure",
+					"name": "ci"
+				},
+				{
+					"type": "build",
+					"name": "default"
+				}
+			]
+		},
+		{
+			"name": "ci-test",
+			"steps": [
+				{
+					"type": "test",
+					"name": "default"
+				}
+			]
+		},
 		{
 			"name": "default",
 			"steps": [
