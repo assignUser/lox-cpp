@@ -21,4 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cmake --workflow --preset default
+      - run: sudo apt install ninja-build
+      - name: Build and test
+        run: cmake --workflow --preset default
