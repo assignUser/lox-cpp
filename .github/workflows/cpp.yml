@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# SPDX-FileCopyrightText: Copyright (c) assignUser
+name: Linux Build
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}-${{ github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: "/tmp/.ccache"
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt install ninja-build ccache
+
+      - uses: assignUser/stash/restore@v1
+        with:
+          path: '${{ env.CCACHE_DIR }}'
+          key: ccache-linux
+
+      - name: Build
+        run: cmake --workflow --preset ci
+
+      - uses: assignUser/stash/save@v1
+        with:
+          path: '${{ env.CCACHE_DIR }}'
+          key: ccache-linux
+
+      - name: Run tests
+        working-directory: build
+        run: ctest -j4 --output-on-failure --no-tests=error
