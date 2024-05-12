@@ -3,29 +3,68 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include <fstream>
 #include <numeric>
-#include <optional>
+#include <utility>
 #include <variant>
 #include <vector>
 
 #include "fmt/core.h"
-#include "fmt/format.h"
 #include "lyra/arg.hpp"
 #include "lyra/help.hpp"
-#include "lyra/lyra.hpp"
+#include "lyra/cli.hpp"
 #include "tl/expected.hpp"
-#include "tl/optional.hpp"
 
-std::vector<std::string> read_input(std::istream &input) {
-  std::vector<std::string> input_lines{};
+#include "lox/error.hpp"
+#include "lox/scanner.hpp"
 
-  for (std::string line; std::getline(input, line);) {
-    input_lines.emplace_back(line);
-  }
-
-  return input_lines;
+[[noreturn]] void report(Error const &error) {
+  fmt::print(stderr, "{}\n", error);
+  std::exit(1);
 }
 
-void print_help() {
+tl::expected<int, Error> run(std::string_view source) {
+  Scanner scanner{source};
+  std::vector tokens = scanner.scanTokens();
+  if (scanner.hasError()) {
+    for (auto error : scanner.getErrors()) {
+      fmt::print(stderr, "{}\n", error);
+    }
+    return tl::unexpected(Error{0, "", "Error while scanning."});
+  }
+  return 0;
+}
+
+tl::expected<int, Error> runFile(std::vector<std::string> const &filenames) {
+  tl::expected<int, Error> result;
+
+  for (auto const &filename : filenames) {
+    std::ifstream file(filename);
+    if (file.is_open()) {
+      fmt::print("Parsing {} ...\n", filename);
+      std::string source((std::istreambuf_iterator<char>(file)),
+                         std::istreambuf_iterator<char>());
+
+      result = run(source);
+    } else {
+      return tl::unexpected(Error(-1, filename, "Error opening file."));
+    }
+  }
+  return result;
+}
+
+tl::expected<int, Error> runPrompt() {
+  while (true) {
+    fmt::print("> ");
+    std::string line;
+    if (not std::getline(std::cin, line)) {
+      break;
+    }
+    run(line);
+  }
+
+  return 0;
+}
+
+[[noreturn]] void print_help() {
   fmt::print("lox - An interpreter for lox written in C++\n");
   fmt::print("Usage:\n{0:4>}lox <file>...\n{0:4>}<stdin> | lox\n", " ");
   std::exit(0);
@@ -35,8 +74,8 @@ int main(int argc, char **argv) {
   std::vector<std::string> filenames{};
   bool show_help{false};
 
-  auto cli = lyra::cli() | lyra::help(show_help) |
-             lyra::arg(filenames, "filename")("Lox file to compile");
+  lyra::cli cli = lyra::cli() | lyra::help(show_help) |
+                  lyra::arg(filenames, "filename")("Lox file to compile");
 
   if (auto result = cli.parse({argc, argv}); !result) {
     fmt::print(stderr, "Error in commandline: {}\n", result.message());
@@ -47,20 +86,10 @@ int main(int argc, char **argv) {
     print_help();
   }
 
-  auto filename = filenames.at(0);
-  std::vector<std::string> input_lines{};
-  if (filename.empty()) {
-    input_lines = read_input(std::cin);
-  } else {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-      fmt::print(stderr, "Error opening file: {}\n", filename);
-      std::exit(1);
-    } else {
-      input_lines = read_input(file);
-    }
-  }
+  tl::expected result{filenames.empty() ? runPrompt() : runFile(filenames)};
 
-  fmt::print("{}\n", fmt::join(input_lines, "\n"));
+  if (!result) {
+    report(result.error());
+  }
   return 0;
 }
