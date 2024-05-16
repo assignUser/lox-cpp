@@ -6,5 +6,5 @@ DerivePointerAlignment: false
 QualifierAlignment: Right
 ColumnLimit: 100
 IncludeBlocks:: Preserve
-BreakTemplateDeclarations: "Yes"
-BreakAfterReturnType: Automatic
+BreakTemplateDeclarations: Yes
+BreakAfterReturnType: All 
