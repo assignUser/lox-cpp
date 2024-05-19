@@ -9,24 +9,19 @@
 
 #include "fmt/core.h"
 #include "lyra/arg.hpp"
-#include "lyra/help.hpp"
 #include "lyra/cli.hpp"
+#include "lyra/help.hpp"
 #include "tl/expected.hpp"
 
 #include "lox/error.hpp"
 #include "lox/scanner.hpp"
-
-[[noreturn]] void report(Error const &error) {
-  fmt::print(stderr, "{}\n", error);
-  std::exit(1);
-}
 
 tl::expected<int, Error> run(std::string_view source) {
   Scanner scanner{source};
   std::vector tokens = scanner.scanTokens();
   if (scanner.hasError()) {
     for (auto error : scanner.getErrors()) {
-      fmt::print(stderr, "{}\n", error);
+      report(error);
     }
     return tl::unexpected(Error{0, "", "Error while scanning."});
   }
@@ -90,6 +85,7 @@ int main(int argc, char **argv) {
 
   if (!result) {
     report(result.error());
+    std::exit(1);
   }
   return 0;
 }
