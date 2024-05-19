@@ -23,8 +23,14 @@ target_link_libraries(
 
 add_library(parser)
 configure_target(parser)
-target_sources(parser PRIVATE ast.hpp parser.cpp)
-target_link_libraries(parser PUBLIC fmt::fmt tl::optional)
+target_sources(
+  parser
+  PRIVATE ast.hpp parser.cpp
+)
+target_link_libraries(
+  parser
+  PUBLIC fmt::fmt tl::expected
+)
 
 add_executable(lox)
 configure_target(lox)
@@ -37,6 +43,7 @@ target_sources(
 target_link_libraries(
   lox
   PRIVATE lox::scanner
+          lox::parser
           fmt::fmt
           tl::expected
           tl::optional

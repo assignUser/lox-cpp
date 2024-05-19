@@ -4,7 +4,6 @@
 #include "lox/parser.hpp"
 
 #include "lox/error.hpp"
-#include <tl/optional.hpp>
 
 Token const &Parser::advance() {
   if (not atEnd()) {
@@ -29,7 +28,7 @@ Token const &Parser::consume(Token::Type type, std::string const &message) {
   throw error(peek(), message);
 }
 
-Error error(Token token, std::string const &message) {
+Error Parser::error(Token token, std::string const &message) {
   Error error = token.type == Token::Type::END_OF_FILE
                     ? Error{token.line, " at end", message}
                     : Error{token.line, " at '" + token.lexeme + "'", message};
@@ -66,11 +65,11 @@ void Parser::synchronize() {
   }
 }
 
-tl::optional<ExprPtr> Parser::parse() {
+tl::expected<ExprPtr, Error> Parser::parse() {
   try {
     return expression();
   } catch (Error e) {
-    return tl::nullopt;
+    return tl::unexpected(e);
   }
 }
 
@@ -160,49 +159,3 @@ ExprPtr Parser::primary() {
 }
 
 
-class Printer : public Visitor {
-public:
-  ~Printer() override = default;
-  std::string print(Expr *expr) {
-
-    expr->accept(*this);
-    return m_str;
-  }
-
-  void visit(Binary const &expr) override {
-    m_str += "(";
-    m_str += fmt::format("{} ", expr.op.lexeme);
-    expr.lhs->accept(*this);
-    expr.rhs->accept(*this);
-    m_str += ")";
-  }
-
-  void visit(Grouping const &expr) override {
-    m_str += "(group ";
-    expr.expr->accept(*this);
-    m_str += ")";
-  }
-
-  void visit(String const &expr) override {
-    m_str += fmt::format(" {} ", expr.value);
-  }
-
-  void visit(Number const &expr) override {
-    m_str += fmt::format(" {} ", expr.value);
-  }
-
-  void visit(Unary const &expr) override {
-    m_str += "(";
-    m_str += fmt::format("{} ", expr.op.lexeme);
-    expr.expr->accept(*this);
-    m_str += ")";
-  }
-
-private:
-  template <typename... Exprs>
-  std::string parenthesize(Expr const &first, Exprs const *...exprs) {
-    first.accept(*this);
-    return parenthesize(exprs...);
-  }
-  std::string m_str{""};
-};

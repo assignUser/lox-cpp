@@ -13,8 +13,63 @@
 #include "lyra/help.hpp"
 #include "tl/expected.hpp"
 
+#include "lox/ast.hpp"
 #include "lox/error.hpp"
+#include "lox/parser.hpp"
 #include "lox/scanner.hpp"
+
+class Printer : public Visitor {
+public:
+  ~Printer() override = default;
+  void print(Expr *expr) {
+    expr->accept(*this);
+
+    fmt::println("{}", m_str);
+  }
+
+  void visit(Binary const &expr) override {
+    m_str += "(";
+    m_str += fmt::format("{} ", expr.op.lexeme);
+    expr.lhs->accept(*this);
+    expr.rhs->accept(*this);
+    m_str += ")";
+  }
+
+  void visit(Grouping const &expr) override {
+    m_str += "(group ";
+    expr.expr->accept(*this);
+    m_str += ")";
+  }
+
+  void visit(String const &expr) override {
+    m_str += fmt::format(" '{}' ", expr.value);
+  }
+
+  void visit(Number const &expr) override {
+    m_str += fmt::format(" {} ", expr.value);
+  }
+
+  void visit(Unary const &expr) override {
+    m_str += "(";
+    m_str += fmt::format("{} ", expr.op.lexeme);
+    expr.expr->accept(*this);
+    m_str += ")";
+  }
+
+  void visit(Boolean const &expr) override {
+    m_str += fmt::format(" {} ", expr.value);
+  }
+
+  void visit(Nil const &expr) override { m_str += fmt::format(" NIL "); }
+
+private:
+  template <typename... Exprs>
+  std::string parenthesize(Expr const &first, Exprs const *...exprs) {
+    first.accept(*this);
+    return parenthesize(exprs...);
+  }
+  std::string m_str{""};
+};
 
 tl::expected<int, Error> run(std::string_view source) {
   Scanner scanner{source};
@@ -25,6 +80,15 @@ tl::expected<int, Error> run(std::string_view source) {
     }
     return tl::unexpected(Error{0, "", "Error while scanning."});
   }
+  auto parser = Parser{tokens};
+  tl::expected<ExprPtr, Error> expression = parser.parse();
+
+  if (not expression) {
+    return tl::unexpected(expression.error());
+  } else {
+    Printer{}.print(expression->get());
+  }
+
   return 0;
 }
 
@@ -83,7 +147,7 @@ int main(int argc, char **argv) {
 
   tl::expected result{filenames.empty() ? runPrompt() : runFile(filenames)};
 
-  if (!result) {
+  if (not result) {
     report(result.error());
     std::exit(1);
   }
