@@ -21,12 +21,17 @@ target_link_libraries(
   PUBLIC fmt::fmt
 )
 
+add_library(parser)
+configure_target(parser)
+target_sources(parser PRIVATE ast.hpp parser.cpp)
+target_link_libraries(parser PUBLIC fmt::fmt tl::optional)
+
 add_executable(lox)
 configure_target(lox)
 
 target_sources(
   lox
-  PRIVATE main.cpp ast_structs.hpp
+  PRIVATE main.cpp
 )
 
 target_link_libraries(
