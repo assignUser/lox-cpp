@@ -2,10 +2,11 @@
 #
 # SPDX-FileCopyrightText: Copyright (c) assignUser
 add_custom_command(
-  OUTPUT ast_structs.hpp
-  COMMAND ast_gen > ${CMAKE_CURRENT_LIST_DIR}/ast_structs.hpp
+  OUTPUT ast.hpp
+  COMMAND ast_gen > ${CMAKE_CURRENT_LIST_DIR}/ast.hpp
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools
-  DEPENDS ${CMAKE_SOURCE_DIR}/tools/ast_gen.cpp
+  DEPENDS ast_gen
+  BYPRODUCTS ${CMAKE_SOURCE_DIR}/lox/ast.hpp
 )
 
 add_library(scanner)

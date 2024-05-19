@@ -33,3 +33,4 @@
 build
 .cache/clangd/index
 lox/ast_structs.hpp
+lox/ast.cpp

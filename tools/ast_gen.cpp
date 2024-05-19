@@ -37,6 +37,8 @@ int main() {
       {"Grouping", {{"std::unique_ptr<Expr>", "expr"}}},
       {"String", {{"std::string", "value"}}},
       {"Number", {{"double", "value"}}},
+      {"Boolean", {{"bool", "value"}}},
+      {"Nil", {{"std::nullptr_t", "value"}}},
       {"Unary", {{"Token", "op"}, {"std::unique_ptr<Expr>", "expr"}}}};
 
   fmt::println("// SPDX-License-Identifier: Apache-2.0");
@@ -45,6 +47,7 @@ int main() {
   fmt::println("");
   fmt::println("#pragma once");
   fmt::println("#include <memory>");
+  fmt::println("#include <cstddef>");
   fmt::println("");
   fmt::println("#include \"lox/token.hpp\"");
   fmt::println("");
@@ -56,7 +59,7 @@ int main() {
   fmt::println("public:");
   fmt::println("  virtual ~Visitor() = default;");
   std::ranges::for_each(nodes, [](Node &node) {
-    fmt::println("  virtual void visit({0} const &expr) const = 0;", node.type);
+    fmt::println("  virtual void visit({0} const &expr) = 0;", node.type);
   });
   fmt::println("}};");
   fmt::println("");
@@ -68,10 +71,10 @@ int main() {
   fmt::println("");
 
   auto class_head = [&](Node node) {
-    fmt::println("class {} : Expr {{", node.type);
+    fmt::println("class {} : public Expr {{", node.type);
     fmt::println("public:");
     // ctor
-    fmt::print("{}{}(", node.fields.size() > 1 ? "" : "  explicit ", node.type);
+    fmt::print("{}{}(", node.fields.size() > 1 ? "  " : "  explicit ", node.type);
     std::string args =
         std::accumulate(node.fields.begin(), node.fields.end(), std::string{""},
                         [&](std::string acc, Field &field) {
@@ -98,8 +101,8 @@ int main() {
           return std::move(acc) + comma + initializer;
         });
     fmt::println("{}{{}}", initializers);
-    fmt::println("[[nodiscard]] static std::unique_ptr<Expr> make({}){{", args);
-    fmt::print("return std::unique_ptr<Expr>(new {}{{", node.type);
+    fmt::println("  [[nodiscard]] static std::unique_ptr<Expr> make({}){{", args);
+    fmt::print("    return std::unique_ptr<Expr>(new {}{{", node.type);
     std::string init_args =
         std::accumulate(node.fields.begin(), node.fields.end(), std::string{""},
                         [&](std::string acc, Field &field) {
