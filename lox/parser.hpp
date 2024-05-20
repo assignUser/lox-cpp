@@ -27,7 +27,7 @@ private:
   [[nodiscard]] bool atEnd() const;
   [[nodiscard]] bool check(Token::Type type) const;
   Token const &consume(Token::Type type, std::string const &message);
-  Error error(Token token, std::string const& message);
+  Error error(Token const& token, std::string const& message);
   template <typename... TokenTs> bool match(TokenTs... types) {
     return (... || (check(types) ? advance(), true : false));
   }

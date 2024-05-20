@@ -20,7 +20,13 @@
 
 class Printer : public Visitor {
 public:
+  Printer() = default;
+  Printer(const Printer &) = default;
+  Printer(Printer &&) = delete;
+  Printer &operator=(const Printer &) = default;
+  Printer &operator=(Printer &&) = delete;
   ~Printer() override = default;
+
   void print(Expr *expr) {
     expr->accept(*this);
 
@@ -75,7 +81,7 @@ tl::expected<int, Error> run(std::string_view source) {
   Scanner scanner{source};
   std::vector tokens = scanner.scanTokens();
   if (scanner.hasError()) {
-    for (auto error : scanner.getErrors()) {
+    for (auto const& error : scanner.getErrors()) {
       report(error);
     }
     return tl::unexpected(Error{0, "", "Error while scanning."});
@@ -123,7 +129,7 @@ tl::expected<int, Error> runPrompt() {
   return 0;
 }
 
-[[noreturn]] void print_help() {
+[[noreturn]] void printHelp() {
   fmt::print("lox - An interpreter for lox written in C++\n");
   fmt::print("Usage:\n{0:4>}lox <file>...\n{0:4>}<stdin> | lox\n", " ");
   std::exit(0);
@@ -142,7 +148,7 @@ int main(int argc, char **argv) {
   }
 
   if (show_help) {
-    print_help();
+    printHelp();
   }
 
   tl::expected result{filenames.empty() ? runPrompt() : runFile(filenames)};
