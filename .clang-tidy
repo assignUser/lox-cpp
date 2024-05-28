@@ -7,6 +7,7 @@ Checks: >
   clang-analyzer-*,
   -clang-analyzer-alpha*,
   google-*,
+  -google-readability-todo,
   modernize-*,
   -modernize-use-trailing-return-type,
   cppcoreguidelines-*,

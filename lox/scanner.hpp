@@ -8,6 +8,8 @@
 #include <variant>
 #include <vector>
 
+#include <fmt/format.h>
+
 #include "lox/error.hpp"
 #include "lox/token.hpp"
 

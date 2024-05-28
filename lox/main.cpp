@@ -16,6 +16,7 @@
 
 #include "lox/ast.hpp"
 #include "lox/error.hpp"
+#include "lox/interpreter.hpp"
 #include "lox/parser.hpp"
 #include "lox/scanner.hpp"
 
@@ -91,6 +92,7 @@ tl::expected<int, Error> run(std::string_view source) {
     return tl::unexpected(expression.error());
   } else {
     Printer{}.print(expression->get());
+    Interpreter{}.evaluate(expression.value().get());
   }
 
   return 0;
