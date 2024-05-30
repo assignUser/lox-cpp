@@ -7,6 +7,7 @@
 #include <memory>
 
 #include <fmt/format.h>
+#include <stdexcept>
 
 #include "lox/token.hpp"
 
@@ -86,6 +87,9 @@ template <typename Derived> [[nodiscard]] bool isA(Expr const &expr) {
 }
 
 template <typename AsType> AsType const &expr_as(const Expr &expr) {
+  if(not isA<AsType>(expr)){
+    throw std::runtime_error{"expr is not off matching type"};
+  }
   return static_cast<AsType const &>(expr);
 }
 

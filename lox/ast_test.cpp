@@ -6,6 +6,7 @@
 
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/benchmark/catch_benchmark.hpp>
 
 const ExprPtr num = Number::make(42);
 
@@ -16,7 +17,7 @@ TEMPLATE_TEST_CASE("classof works (negative)", "[ast]", Binary, Boolean,
   REQUIRE(not isA<TestType>(*num));
 }
 
-TEST_CASE("equals works", "[ast]"){
+TEST_CASE("equals works", "[ast]") {
   Nil nil{nullptr};
 
   Boolean yes{true};
@@ -30,18 +31,22 @@ TEST_CASE("equals works", "[ast]"){
   Number num2 = num1;
   Number num3{43};
 
-  Binary bin1{Number::make(23), Token{Token::Type::PLUS, "+"}, Number::make(42)};
-  Binary bin2{Number::make(23), Token{Token::Type::PLUS, "+"}, Number::make(42)};
-  Binary bin3{String::make("blub"), Token{Token::Type::PLUS, "+"}, Number::make(42)};
+  Binary bin1{Number::make(23), Token{Token::Type::PLUS, "+"},
+              Number::make(42)};
+  Binary bin2{Number::make(23), Token{Token::Type::PLUS, "+"},
+              Number::make(42)};
+  Binary bin3{String::make("blub"), Token{Token::Type::PLUS, "+"},
+              Number::make(42)};
 
-  Grouping grp1{Binary::make(String::make("blub"), Token{Token::Type::PLUS, "+"}, Number::make(42))};
-  Grouping grp2{Binary::make(String::make("blub"), Token{Token::Type::PLUS, "+"}, Number::make(42))};
+  Grouping grp1{Binary::make(String::make("blub"),
+                             Token{Token::Type::PLUS, "+"}, Number::make(42))};
+  Grouping grp2{Binary::make(String::make("blub"),
+                             Token{Token::Type::PLUS, "+"}, Number::make(42))};
   Grouping grp3{Number::make(43)};
 
   Unary ury1{Token{Token::Type::BANG, "!"}, Boolean::make(false)};
   Unary ury2{Token{Token::Type::BANG, "!"}, Boolean::make(false)};
   Unary ury3{Token{Token::Type::BANG, "!"}, Boolean::make(true)};
-
 
   REQUIRE(nil.equals(nil));
   REQUIRE(not nil.equals(yes));
@@ -74,5 +79,6 @@ TEST_CASE("equals works", "[ast]"){
   REQUIRE(ury1.equals(ury2));
   REQUIRE(not ury1.equals(ury3));
   REQUIRE(not ury1.equals(str1));
+  REQUIRE_THROWS(expr_as<Binary>(str1));
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
