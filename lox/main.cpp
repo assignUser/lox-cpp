@@ -71,6 +71,8 @@ public:
   }
 
   void visit(Nil const &expr) override { m_str.append(" NIL "sv); }
+  void visit(Expression const &expr) override { ; }
+  void visit(Print const &expr) override { ; }
 
 private:
   std::string m_str{""};

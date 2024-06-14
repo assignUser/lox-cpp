@@ -15,6 +15,8 @@ public:
   void visit(Number const &expr) override;
   void visit(String const &expr) override;
   void visit(Unary const &expr) override;
+  void visit(Expression const &expr) override;
+  void visit(Print const &expr) override;
 
 private:
   void eval(Expr *expr);

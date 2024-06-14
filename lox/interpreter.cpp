@@ -154,3 +154,7 @@ void Interpreter::visit(Unary const &expr) {
     throw; // TODO proper error
   }
 }
+
+void Interpreter::visit(Expression const &expr) {;}
+void Interpreter::visit(Print const &expr) {;}
+
