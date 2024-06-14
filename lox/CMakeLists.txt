@@ -55,13 +55,5 @@ target_link_libraries(
 )
 
 if(BUILD_TESTING)
-  add_executable(scanner_test scanner_test.cpp)
-  configure_target(scanner_test)
-  target_link_libraries(scanner_test PRIVATE lox::scanner Catch2::Catch2WithMain)
-  catch_discover_tests(scanner_test EXTRA_ARGS -b)
-
-  add_executable(ast_test ast_test.cpp)
-  configure_target(ast_test)
-  target_link_libraries(ast_test PRIVATE fmt::fmt Catch2::Catch2WithMain)
-  catch_discover_tests(ast_test EXTRA_ARGS -b)
+  add_subdirectory(tests)
 endif()
