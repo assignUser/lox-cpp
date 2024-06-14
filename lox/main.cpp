@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include <fstream>
 #include <numeric>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -17,6 +18,8 @@
 #include "lox/error.hpp"
 #include "lox/parser.hpp"
 #include "lox/scanner.hpp"
+
+using std::operator""sv;
 
 class Printer : public Visitor {
 public:
@@ -66,14 +69,9 @@ public:
     m_str += fmt::format(" {} ", expr.value);
   }
 
-  void visit(Nil const &expr) override { m_str += fmt::format(" NIL "); }
+  void visit(Nil const &expr) override { m_str.append(" NIL "sv); }
 
 private:
-  template <typename... Exprs>
-  std::string parenthesize(Expr const &first, Exprs const *...exprs) {
-    first.accept(*this);
-    return parenthesize(exprs...);
-  }
   std::string m_str{""};
 };
 
@@ -81,7 +79,7 @@ tl::expected<int, Error> run(std::string_view source) {
   Scanner scanner{source};
   std::vector tokens = scanner.scanTokens();
   if (scanner.hasError()) {
-    for (auto const& error : scanner.getErrors()) {
+    for (auto const &error : scanner.getErrors()) {
       report(error);
     }
     return tl::unexpected(Error{0, "", "Error while scanning."});

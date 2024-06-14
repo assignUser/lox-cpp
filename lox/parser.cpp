@@ -143,7 +143,7 @@ ExprPtr Parser::primary() {
   } else if (match(Token::Type::TRUE)) {
     return Boolean::make(true);
   } else if (match(Token::Type::NIL)) {
-    return Nil::make(nullptr);
+    return Nil::make();
   } else if (match(Token::Type::STRING)) {
     return String::make(std::get<std::string>(previous().literal));
   } else if (match(Token::Type::NUMBER)) {
