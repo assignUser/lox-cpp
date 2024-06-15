@@ -85,7 +85,7 @@ const static std::map<Expr::ExprKind, std::string_view> expr_kind_literals{
 template <>
 struct fmt::formatter<Expr::ExprKind> : fmt::formatter<std::string_view> {
   auto format(const Expr::ExprKind &e, format_context &ctx) const {
-    return formatter<std::string_view>::format(kind_literals.at(e),
+    return formatter<std::string_view>::format(expr_kind_literals.at(e),
                                                ctx);
   }
 };

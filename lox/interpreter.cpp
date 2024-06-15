@@ -29,7 +29,7 @@ Expr const &Interpreter::evaluate(Expr *expr) {
 
   } catch (Error e) {
     report(e);
-    m_result = Nil::make(nullptr);
+    m_result = Nil::make();
   }
 
   return *m_result;
@@ -123,7 +123,7 @@ void Interpreter::visit(Boolean const &expr) {
 
 void Interpreter::visit(Grouping const &expr) { eval(expr.expr.get()); }
 
-void Interpreter::visit(Nil const &expr) { m_result = Nil::make(nullptr); }
+void Interpreter::visit(Nil const &expr) { m_result = Nil::make(); }
 
 void Interpreter::visit(Number const &expr) {
   m_result = Number::make(expr.value);
