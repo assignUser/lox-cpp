@@ -1,13 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # SPDX-FileCopyrightText: Copyright (c) assignUser
-add_custom_command(
-  OUTPUT ast_structs.hpp
-  COMMAND ast_gen > ${CMAKE_CURRENT_LIST_DIR}/ast_structs.hpp
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools
-  DEPENDS ${CMAKE_SOURCE_DIR}/tools/ast_gen.cpp
-)
-
 add_library(scanner)
 configure_target(scanner)
 
@@ -20,17 +13,29 @@ target_link_libraries(
   PUBLIC fmt::fmt
 )
 
+add_library(parser)
+configure_target(parser)
+target_sources(
+  parser
+  PRIVATE ast.hpp parser.cpp
+)
+target_link_libraries(
+  parser
+  PUBLIC fmt::fmt tl::expected
+)
+
 add_executable(lox)
 configure_target(lox)
 
 target_sources(
   lox
-  PRIVATE main.cpp ast_structs.hpp
+  PRIVATE main.cpp
 )
 
 target_link_libraries(
   lox
   PRIVATE lox::scanner
+          lox::parser
           fmt::fmt
           tl::expected
           tl::optional

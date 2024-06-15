@@ -35,5 +35,4 @@ set(BUILD_TESTING ON)
 include(CTest)
 include(Catch)
 
-add_subdirectory(tools)
 add_subdirectory(lox)

@@ -3,33 +3,96 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include <fstream>
 #include <numeric>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include "fmt/core.h"
 #include "lyra/arg.hpp"
-#include "lyra/help.hpp"
 #include "lyra/cli.hpp"
+#include "lyra/help.hpp"
 #include "tl/expected.hpp"
 
+#include "lox/ast.hpp"
 #include "lox/error.hpp"
+#include "lox/parser.hpp"
 #include "lox/scanner.hpp"
 
-[[noreturn]] void report(Error const &error) {
-  fmt::print(stderr, "{}\n", error);
-  std::exit(1);
-}
+using std::operator""sv;
+
+class Printer : public Visitor {
+public:
+  Printer() = default;
+  Printer(const Printer &) = default;
+  Printer(Printer &&) = delete;
+  Printer &operator=(const Printer &) = default;
+  Printer &operator=(Printer &&) = delete;
+  ~Printer() override = default;
+
+  void print(Expr *expr) {
+    expr->accept(*this);
+
+    fmt::println("{}", m_str);
+  }
+
+  void visit(Binary const &expr) override {
+    m_str += "(";
+    m_str += fmt::format("{} ", expr.op.lexeme);
+    expr.lhs->accept(*this);
+    expr.rhs->accept(*this);
+    m_str += ")";
+  }
+
+  void visit(Grouping const &expr) override {
+    m_str += "(group ";
+    expr.expr->accept(*this);
+    m_str += ")";
+  }
+
+  void visit(String const &expr) override {
+    m_str += fmt::format(" '{}' ", expr.value);
+  }
+
+  void visit(Number const &expr) override {
+    m_str += fmt::format(" {} ", expr.value);
+  }
+
+  void visit(Unary const &expr) override {
+    m_str += "(";
+    m_str += fmt::format("{} ", expr.op.lexeme);
+    expr.expr->accept(*this);
+    m_str += ")";
+  }
+
+  void visit(Boolean const &expr) override {
+    m_str += fmt::format(" {} ", expr.value);
+  }
+
+  void visit(Nil const &expr) override { m_str.append(" NIL "sv); }
+
+private:
+  std::string m_str{""};
+};
 
 tl::expected<int, Error> run(std::string_view source) {
   Scanner scanner{source};
   std::vector tokens = scanner.scanTokens();
   if (scanner.hasError()) {
-    for (auto error : scanner.getErrors()) {
-      fmt::print(stderr, "{}\n", error);
+    for (auto const &error : scanner.getErrors()) {
+      report(error);
     }
     return tl::unexpected(Error{0, "", "Error while scanning."});
   }
+  auto parser = Parser{tokens};
+  tl::expected<ExprPtr, Error> expression = parser.parse();
+
+  if (not expression) {
+    return tl::unexpected(expression.error());
+  } else {
+    Printer{}.print(expression->get());
+  }
+
   return 0;
 }
 
@@ -64,7 +127,7 @@ tl::expected<int, Error> runPrompt() {
   return 0;
 }
 
-[[noreturn]] void print_help() {
+[[noreturn]] void printHelp() {
   fmt::print("lox - An interpreter for lox written in C++\n");
   fmt::print("Usage:\n{0:4>}lox <file>...\n{0:4>}<stdin> | lox\n", " ");
   std::exit(0);
@@ -83,13 +146,14 @@ int main(int argc, char **argv) {
   }
 
   if (show_help) {
-    print_help();
+    printHelp();
   }
 
   tl::expected result{filenames.empty() ? runPrompt() : runFile(filenames)};
 
-  if (!result) {
+  if (not result) {
     report(result.error());
+    std::exit(1);
   }
   return 0;
 }
