@@ -5,10 +5,8 @@
 
 #include <map>
 #include <string>
-#include <variant>
 #include <vector>
 
-#include <fmt/format.h>
 
 #include "lox/error.hpp"
 #include "lox/token.hpp"
@@ -46,33 +44,4 @@ private:
   std::string m_source{};
   std::vector<Token> m_tokens{};
   std::vector<Error> m_errors{};
-};
-
-template <>
-struct fmt::formatter<Token::Type> : fmt::formatter<std::string_view> {
-  auto format(const Token::Type &t, format_context &ctx) const {
-    return formatter<std::string_view>::format(Token::token_literals.at(t),
-                                               ctx);
-  }
-};
-
-template <typename... Ts> struct fmt::formatter<std::variant<Ts...>> {
-  template <typename FormatParseContext>
-  constexpr static auto parse(FormatParseContext &ctx) {
-    return ctx.end();
-  }
-
-  constexpr static auto format(std::variant<Ts...> const &value,
-                               fmt::format_context &ctx) {
-    return std::visit(
-        [&ctx](auto const &v) { return fmt::format_to(ctx.out(), "{}", v); },
-        value);
-  }
-};
-
-template <> struct fmt::formatter<Token> : fmt::formatter<std::string_view> {
-  auto format(Token const &t, format_context &ctx) const {
-    return formatter<std::string_view>::format(
-        fmt::format("{} {} {}", t.type, t.lexeme, t.literal), ctx);
-  }
 };
