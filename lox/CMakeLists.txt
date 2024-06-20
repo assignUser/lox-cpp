@@ -1,37 +1,26 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # SPDX-FileCopyrightText: Copyright (c) assignUser
-add_library(scanner)
-configure_target(scanner)
+add_library(frontend)
+configure_target(frontend)
 
 target_sources(
-  scanner
-  PRIVATE scanner.cpp
+  frontend
+  PRIVATE scanner.cpp parser.cpp
 )
 target_link_libraries(
-  scanner
-  PUBLIC fmt::fmt
-)
-
-add_library(parser)
-configure_target(parser)
-target_sources(
-  parser
-  PRIVATE parser.cpp
-)
-target_link_libraries(
-  parser
+  frontend
   PUBLIC fmt::fmt tl::expected
 )
 
-add_library(interpreter)
-configure_target(interpreter)
+add_library(backend)
+configure_target(backend)
 target_sources(
-  interpreter
+  backend
   PRIVATE interpreter.cpp
 )
 target_link_libraries(
-  interpreter
+  backend
   PUBLIC fmt::fmt
 )
 
@@ -45,9 +34,8 @@ target_sources(
 
 target_link_libraries(
   lox
-  PRIVATE lox::scanner
-          lox::parser
-          lox::interpreter
+  PRIVATE lox::frontend
+          lox::backend
           fmt::fmt
           tl::expected
           tl::optional

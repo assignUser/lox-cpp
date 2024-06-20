@@ -37,6 +37,14 @@ TEST_CASE("Multichar tokens are lexed correctly", "[scanner]") {
   }
 }
 
+TEST_CASE("Scanner handles empty input", "[scanner]"){
+  Scanner scanner {""};
+  std::vector tokens = scanner.scanTokens();
+  REQUIRE(not scanner.hasError());
+  REQUIRE(tokens.size() == 1);
+  REQUIRE(tokens.at(0).type == Token::Type::END_OF_FILE );
+}
+
 TEST_CASE("String literals", "[scanner]") {
   Scanner scanner{
       "\"This is a string literal and // can\n contain\n illegal #@ Symbols\""};
