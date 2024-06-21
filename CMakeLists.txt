@@ -11,7 +11,6 @@ function(configure_target target)
     PROPERTIES CXX_EXTENSIONS OFF
                CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON)
-  target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR})
 
   get_target_property(target_type ${target} TYPE)
 

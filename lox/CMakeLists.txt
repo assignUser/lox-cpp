@@ -1,46 +1,68 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # SPDX-FileCopyrightText: Copyright (c) assignUser
+add_library(util_header INTERFACE)
+configure_target(util_header)
+target_sources(
+  util_header
+  INTERFACE FILE_SET
+            HEADERS
+            BASE_DIRS
+            ${PROJECT_SOURCE_DIR}
+            FILES
+            ast.hpp
+            error.hpp
+            token.hpp)
+
 add_library(frontend)
 configure_target(frontend)
-
 target_sources(
   frontend
-  PRIVATE scanner.cpp parser.cpp
-)
+  PRIVATE scanner.cpp parser.cpp)
+target_sources(
+  frontend
+  PUBLIC FILE_SET
+         HEADERS
+         BASE_DIRS
+         ${PROJECT_SOURCE_DIR}
+         FILES
+         parser.hpp
+         scanner.hpp)
 target_link_libraries(
   frontend
-  PUBLIC fmt::fmt tl::expected
-)
+  PUBLIC lox::util_header fmt::fmt tl::expected)
 
 add_library(backend)
 configure_target(backend)
 target_sources(
   backend
-  PRIVATE interpreter.cpp
-)
+  PRIVATE interpreter.cpp)
+target_sources(
+  backend
+  PUBLIC FILE_SET
+         HEADERS
+         BASE_DIRS
+         ${PROJECT_SOURCE_DIR}
+         FILES
+         interpreter.hpp)
 target_link_libraries(
   backend
-  PUBLIC fmt::fmt
-)
+  PUBLIC lox::util_header fmt::fmt)
 
 add_executable(lox)
 configure_target(lox)
-
 target_sources(
   lox
-  PRIVATE main.cpp
-)
-
+  PRIVATE main.cpp)
 target_link_libraries(
   lox
   PRIVATE lox::frontend
           lox::backend
+          lox::util_header
           fmt::fmt
           tl::expected
           tl::optional
-          bfg::lyra
-)
+          bfg::lyra)
 
 if(BUILD_TESTING)
   add_subdirectory(tests)
