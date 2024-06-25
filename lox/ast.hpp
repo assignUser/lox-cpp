@@ -3,11 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 
 #pragma once
-#include <cstddef>
 #include <memory>
 
 #include <fmt/format.h>
-#include <stdexcept>
 
 #include "lox/token.hpp"
 

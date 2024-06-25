@@ -39,7 +39,7 @@ public:
 
   void visit(Binary const &expr) override {
     m_str += "(";
-    m_str += fmt::format("{} ", expr.op.lexeme);
+    m_str += fmt::format("{} ", expr.op.lexem);
     expr.lhs->accept(*this);
     expr.rhs->accept(*this);
     m_str += ")";
@@ -61,7 +61,7 @@ public:
 
   void visit(Unary const &expr) override {
     m_str += "(";
-    m_str += fmt::format("{} ", expr.op.lexeme);
+    m_str += fmt::format("{} ", expr.op.lexem);
     expr.expr->accept(*this);
     m_str += ")";
   }

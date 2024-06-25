@@ -91,7 +91,7 @@ void Interpreter::visit(Binary const &expr) {
           0, "",
           fmt::format(
               "Invalid operator '{}' for binary expression <Number op Number>.",
-              expr.op.lexeme)};
+              expr.op.lexem)};
     }
     return;
   }
@@ -106,7 +106,7 @@ void Interpreter::visit(Binary const &expr) {
           0, "",
           fmt::format(
               "Invalid operator '{}' for binary expression <String op String>.",
-              expr.op.lexeme)};
+              expr.op.lexem)};
     }
   }
 
@@ -114,7 +114,7 @@ void Interpreter::visit(Binary const &expr) {
   throw Error{
       0, "",
       fmt::format("Invalid operator '{}' for binary expression <{} op {}>.",
-                  expr.op.lexeme, expr.rhs->getKind(), expr.lhs->getKind())};
+                  expr.op.lexem, expr.rhs->getKind(), expr.lhs->getKind())};
 }
 
 void Interpreter::visit(Boolean const &expr) {

@@ -5,10 +5,9 @@
 
 #include <charconv>
 #include <fmt/format.h>
-#include <stdexcept>
 
 void Scanner::addToken(Token::Type type,
-                       std::variant<std::string, double> literal) {
+                       std::variant<std::string, double> const &literal) {
   auto text{m_source.substr(m_start, m_current - m_start)};
   m_tokens.emplace_back(type, text, literal, m_line);
 }
@@ -37,9 +36,9 @@ void Scanner::identifier() {
   }
   Token::Type type{Token::Type::IDENTIFIER};
 
-  std::string lexeme = m_source.substr(m_start, m_current - m_start);
-  if (Token::keywords.contains(lexeme)) {
-    type = Token::keywords.at(lexeme);
+  std::string lexem = m_source.substr(m_start, m_current - m_start);
+  if (Token::keywords.contains(lexem)) {
+    type = Token::keywords.at(lexem);
   }
   addToken(type);
 }
@@ -68,8 +67,9 @@ void Scanner::number() {
   }
 
   double number{};
-  auto [ptr, ec] = std::from_chars(m_source.data() + m_start,
-                                   m_source.data() + m_current, number);
+  auto [ptr, ec] =
+      std::from_chars(std::next(m_source.data(), m_start),
+                      std::next(m_source.data(), m_current), number);
   if (ec == std::errc()) {
     addToken(Token::Type::NUMBER, number);
   } else if (ec == std::errc::invalid_argument) {

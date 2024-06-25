@@ -4,7 +4,9 @@
 #pragma once
 
 #include <map>
+#include <numeric>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -62,7 +64,7 @@ struct Token {
   };
 
   Type type{};
-  std::string lexeme{};
+  std::string lexem{};
   std::variant<std::string, double> literal{};
   int line{};
 
@@ -79,7 +81,7 @@ struct Token {
   static const inline std::map<Token::Type, std::string_view> token_literals{
       {Token::Type::LEFT_PAREN, "("},
       {Token::Type::RIGHT_PAREN, ")"},
-      {Token::Type::LEFT_BRACE, "{Token::Type::"},
+      {Token::Type::LEFT_BRACE, "{"},
       {Token::Type::RIGHT_BRACE, "}"},
       {Token::Type::COMMA, ","},
       {Token::Type::DOT, "."},
@@ -143,6 +145,18 @@ template <typename... Ts> struct fmt::formatter<std::variant<Ts...>> {
 template <> struct fmt::formatter<Token> : fmt::formatter<std::string_view> {
   auto format(Token const &t, format_context &ctx) const {
     return formatter<std::string_view>::format(
-        fmt::format("{} {} {}", t.type, t.lexeme, t.literal), ctx);
+        fmt::format("{} {} {}", t.type, t.lexem, t.literal), ctx);
+  }
+};
+
+template <>
+struct fmt::formatter<std::vector<Token>> : fmt::formatter<std::string_view> {
+  auto format(std::vector<Token> const &tokens, format_context &ctx) const {
+    return formatter<std::string_view>::format(
+        std::accumulate(tokens.begin(), tokens.end(), std::string{},
+                        [&](std::string lit, Token const &token) {
+                          return std::move(lit) + " " + token.lexem;
+                        }),
+        ctx);
   }
 };

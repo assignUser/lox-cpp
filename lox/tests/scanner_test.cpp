@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // SPDX-FileCopyrightText: Copyright (c) assignUser
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
 
 #include "lox/scanner.hpp"
 
@@ -22,7 +23,7 @@ TEST_CASE("Multichar tokens are lexed correctly", "[scanner]") {
   std::vector tokens = scanner.scanTokens();
   REQUIRE(not scanner.hasError());
   REQUIRE(tokens.size() == expected.size());
-  REQUIRE(tokens.at(1).lexeme == "!=");
+  REQUIRE(tokens.at(1).lexem == "!=");
 
   for (auto i{0}; i < tokens.size(); i++) {
     REQUIRE(tokens.at(i).type == expected.at(i));
@@ -83,7 +84,7 @@ TEST_CASE("Identifiers", "[scanner]") {
   auto tokens = scanner.scanTokens();
 
   REQUIRE(not scanner.hasError());
-  REQUIRE(tokens.at(0).lexeme == "aVariable");
+  REQUIRE(tokens.at(0).lexem == "aVariable");
 }
 
 TEST_CASE("Keywords", "[scanner]") {
@@ -96,8 +97,8 @@ TEST_CASE("Keywords", "[scanner]") {
 
   REQUIRE(not scanner.hasError());
   REQUIRE(tokens.size() == expected.size());
-  REQUIRE(tokens.at(2).lexeme == "orchid");
-  REQUIRE(tokens.at(4).lexeme == "ifrit");
+  REQUIRE(tokens.at(2).lexem == "orchid");
+  REQUIRE(tokens.at(4).lexem == "ifrit");
 
   for (auto i{0}; i < tokens.size(); i++) {
     REQUIRE(tokens.at(i).type == expected.at(i));
@@ -116,8 +117,8 @@ TEST_CASE("Multi-line block comments work", "[scanner]") {
 
   REQUIRE(not scanner.hasError());
   REQUIRE(tokens.size() == expected.size());
-  REQUIRE(tokens.at(2).lexeme == "orchid");
-  REQUIRE(tokens.at(4).lexeme == "ifrit");
+  REQUIRE(tokens.at(2).lexem == "orchid");
+  REQUIRE(tokens.at(4).lexem == "ifrit");
 
   for (auto i{0}; i < tokens.size(); i++) {
     REQUIRE(tokens.at(i).type == expected.at(i));

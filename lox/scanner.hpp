@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-
 #include "lox/error.hpp"
 #include "lox/token.hpp"
 
@@ -30,7 +29,8 @@ private:
   void scanToken();
   void string();
 
-  void addToken(Token::Type type, std::variant<std::string, double> literal);
+  void addToken(Token::Type type,
+                std::variant<std::string, double> const &literal);
   void addToken(Token::Type type) { addToken(type, ""); }
   char advance() { return m_source.at(m_current++); }
   bool atEnd() { return m_current >= m_source.length(); }
