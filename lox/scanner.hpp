@@ -18,6 +18,14 @@ public:
 
   bool hasError() { return not m_errors.empty(); }
   std::vector<Error> &getErrors() { return m_errors; }
+  void clear() {
+    m_start = 0;
+    m_current = 0;
+    m_line = 0;
+    m_source.clear();
+    m_tokens.clear();
+    m_errors.clear();
+  }
 
 private:
   void blockComment();
