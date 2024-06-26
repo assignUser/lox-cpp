@@ -11,7 +11,7 @@ workflow:
   cmake --workflow --preset default
 
 configure:
-  cmake --preset default 
+  cmake --preset default
 
 build:
   cmake --build build
@@ -21,3 +21,6 @@ run FILE="":
 
 clean-all:
   rm -rf build/*
+
+watch:
+  find lox/ | entr -s 'ninja -C build && ctest --output-on-failure --stop-on-failure --no-tests=error --test-dir build/'

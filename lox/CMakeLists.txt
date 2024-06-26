@@ -1,52 +1,71 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # SPDX-FileCopyrightText: Copyright (c) assignUser
-add_library(scanner)
-configure_target(scanner)
-
+add_library(util_header INTERFACE)
+configure_target(util_header)
 target_sources(
-  scanner
-  PRIVATE scanner.cpp
-)
+  util_header
+  INTERFACE FILE_SET
+            HEADERS
+            BASE_DIRS
+            ${PROJECT_SOURCE_DIR}
+            FILES
+            ast.hpp
+            error.hpp
+            token.hpp)
 target_link_libraries(
-  scanner
-  PUBLIC fmt::fmt
-)
+  util_header
+  INTERFACE fmt::fmt)
 
-add_library(parser)
-configure_target(parser)
+add_library(frontend)
+configure_target(frontend)
 target_sources(
-  parser
-  PRIVATE ast.hpp parser.cpp
-)
+  frontend
+  PRIVATE scanner.cpp parser.cpp
+  PUBLIC FILE_SET
+         HEADERS
+         BASE_DIRS
+         ${PROJECT_SOURCE_DIR}
+         FILES
+         parser.hpp
+         scanner.hpp)
 target_link_libraries(
-  parser
-  PUBLIC fmt::fmt tl::expected
-)
+  frontend
+  PUBLIC lox::util_header tl::expected
+  PRIVATE fmt::fmt)
+
+add_library(backend)
+configure_target(backend)
+target_sources(
+  backend
+  PRIVATE interpreter.cpp
+  PUBLIC FILE_SET
+         HEADERS
+         BASE_DIRS
+         ${PROJECT_SOURCE_DIR}
+         FILES
+         interpreter.hpp)
+
+target_link_libraries(
+  backend
+  PUBLIC lox::util_header
+  PRIVATE fmt::fmt)
 
 add_executable(lox)
 configure_target(lox)
-
 target_sources(
   lox
-  PRIVATE main.cpp
-)
-
+  PRIVATE main.cpp)
 target_link_libraries(
   lox
-  PRIVATE lox::scanner
-          lox::parser
+  PRIVATE lox::frontend
+          lox::backend
+          lox::util_header
           fmt::fmt
           tl::expected
           tl::optional
-          bfg::lyra
-)
+          bfg::lyra)
 
 if(BUILD_TESTING)
-  add_executable(scanner_test scanner_test.cpp)
-  configure_target(scanner_test)
-
-  target_link_libraries(scanner_test PRIVATE lox::scanner Catch2::Catch2WithMain)
-
-  catch_discover_tests(scanner_test EXTRA_ARGS -b)
+  add_subdirectory(tests)
 endif()

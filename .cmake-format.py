@@ -9,7 +9,6 @@ with section("format"):
     max_pargs_hwrap = 4
     separate_ctrl_name_with_space = False
     separate_fn_name_with_space = False
-    dangle_parens = True
     dangle_align = "prefix"
     min_prefix_chars = 4
     max_lines_hwrap = 2

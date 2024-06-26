@@ -16,6 +16,7 @@
 
 #include "lox/ast.hpp"
 #include "lox/error.hpp"
+#include "lox/interpreter.hpp"
 #include "lox/parser.hpp"
 #include "lox/scanner.hpp"
 
@@ -38,7 +39,7 @@ public:
 
   void visit(Binary const &expr) override {
     m_str += "(";
-    m_str += fmt::format("{} ", expr.op.lexeme);
+    m_str += fmt::format("{} ", expr.op.lexem);
     expr.lhs->accept(*this);
     expr.rhs->accept(*this);
     m_str += ")";
@@ -60,7 +61,7 @@ public:
 
   void visit(Unary const &expr) override {
     m_str += "(";
-    m_str += fmt::format("{} ", expr.op.lexeme);
+    m_str += fmt::format("{} ", expr.op.lexem);
     expr.expr->accept(*this);
     m_str += ")";
   }
@@ -70,6 +71,8 @@ public:
   }
 
   void visit(Nil const &expr) override { m_str.append(" NIL "sv); }
+  void visit(Expression const &expr) override { ; }
+  void visit(Print const &expr) override { ; }
 
 private:
   std::string m_str{""};
@@ -91,6 +94,7 @@ tl::expected<int, Error> run(std::string_view source) {
     return tl::unexpected(expression.error());
   } else {
     Printer{}.print(expression->get());
+    Interpreter{}.evaluate(expression.value().get());
   }
 
   return 0;
