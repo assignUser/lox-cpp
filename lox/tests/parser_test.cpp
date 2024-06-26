@@ -12,6 +12,9 @@
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
 #include <fmt/core.h>
+#include <tl/expected.hpp>
+#include <tuple>
+#include <vector>
 
 #include "lox/ast.hpp"
 #include "lox/parser.hpp"
@@ -35,39 +38,35 @@ public:
   }
 
   void visit(Binary const &expr) override {
-    m_str += "(";
-    m_str += fmt::format("{} ", expr.op.lexem);
     expr.lhs->accept(*this);
+    m_str += fmt::format(" {} ", expr.op.lexem);
     expr.rhs->accept(*this);
-    m_str += ")";
   }
 
   void visit(Grouping const &expr) override {
-    m_str += "(group ";
+    m_str += "(";
     expr.expr->accept(*this);
     m_str += ")";
   }
 
   void visit(String const &expr) override {
-    m_str += fmt::format(" '{}' ", expr.value);
+    m_str += fmt::format("'{}'", expr.value);
   }
 
   void visit(Number const &expr) override {
-    m_str += fmt::format(" {} ", expr.value);
+    m_str += fmt::format("{}", expr.value);
   }
 
   void visit(Unary const &expr) override {
-    m_str += "(";
-    m_str += fmt::format("{} ", expr.op.lexem);
+    m_str += fmt::format("{}", expr.op.lexem);
     expr.expr->accept(*this);
-    m_str += ")";
   }
 
   void visit(Boolean const &expr) override {
-    m_str += fmt::format(" {} ", expr.value);
+    m_str += fmt::format("{}", expr.value);
   }
 
-  void visit(Nil const &expr) override { m_str.append(" NIL "sv); }
+  void visit(Nil const &expr) override { m_str.append("NIL"sv); }
   void visit(Expression const &expr) override { ; }
   void visit(Print const &expr) override { ; }
 
@@ -77,9 +76,15 @@ private:
 
 class AstGenerator {
 public:
-  ExprPtr generate() { return expression(); }
+  std::tuple<std::vector<Token>, ExprPtr> generate() {
+    ExprPtr ast = expression();
+    if (m_tokens.back().type != Token::Type::END_OF_FILE) {
+      m_tokens.emplace_back(Token::Type::END_OF_FILE);
+    }
+    return std::make_tuple(m_tokens, std::move(ast));
+  }
 
-private:
+  // private:
   enum class Kleene { ZERO, MORE };
   enum class Choice { A, B, C, D, E, F, G };
 
@@ -91,10 +96,10 @@ private:
     Token op;
     switch (getChoice2()) {
     case Choice::A:
-      op = Token{Token::Type::BANG_EQUAL, "!="};
+      op = Token{Token::Type::BANG_EQUAL, "!=", "!="};
       break;
     case Choice::B:
-      op = Token{Token::Type::EQUAL_EQUAL, "=="};
+      op = Token{Token::Type::EQUAL_EQUAL, "==", "=="};
       break;
     default:
       throw std::range_error(
@@ -105,9 +110,13 @@ private:
     case Kleene::ZERO:
       return comparison();
       break;
-    case Kleene::MORE:
-      return Binary::make(comparison(), op, comparison());
+    case Kleene::MORE: {
+      ExprPtr lhs = comparison();
+      m_tokens.push_back(op);
+      ExprPtr rhs = comparison();
+      return Binary::make(std::move(lhs), op, std::move(rhs));
       break;
+    }
     default:
       throw std::range_error("Unreachable.");
     }
@@ -118,16 +127,16 @@ private:
     Token op;
     switch (getChoice4()) {
     case Choice::A:
-      op = Token{Token::Type::GREATER, ">"};
+      op = Token{Token::Type::GREATER, ">", ">"};
       break;
     case Choice::B:
-      op = Token{Token::Type::GREATER_EQUAL, ">="};
+      op = Token{Token::Type::GREATER_EQUAL, ">=", ">="};
       break;
     case Choice::C:
-      op = Token{Token::Type::LESS, "<"};
+      op = Token{Token::Type::LESS, "<", "<"};
       break;
     case Choice::D:
-      op = Token{Token::Type::LESS_EQUAL, "<="};
+      op = Token{Token::Type::LESS_EQUAL, "<=", "<="};
       break;
     default:
       throw std::range_error(
@@ -138,9 +147,13 @@ private:
     case Kleene::ZERO:
       return term();
       break;
-    case Kleene::MORE:
-      return Binary::make(term(), op, term());
+    case Kleene::MORE: {
+      ExprPtr lhs = term();
+      m_tokens.push_back(op);
+      ExprPtr rhs = term();
+      return Binary::make(std::move(lhs), op, std::move(rhs));
       break;
+    }
     default:
       throw std::range_error("Unreachable.");
     }
@@ -151,10 +164,10 @@ private:
     Token op;
     switch (getChoice2()) {
     case Choice::A:
-      op = Token{Token::Type::MINUS, "-"};
+      op = Token{Token::Type::MINUS, "-", "-"};
       break;
     case Choice::B:
-      op = Token{Token::Type::PLUS, "+"};
+      op = Token{Token::Type::PLUS, "+", "+"};
       break;
     default:
       throw std::range_error(
@@ -165,9 +178,13 @@ private:
     case Kleene::ZERO:
       return factor();
       break;
-    case Kleene::MORE:
-      return Binary::make(factor(), op, factor());
+    case Kleene::MORE: {
+      ExprPtr lhs = factor();
+      m_tokens.push_back(op);
+      ExprPtr rhs = factor();
+      return Binary::make(std::move(lhs), op, std::move(rhs));
       break;
+    }
     default:
       throw std::range_error("Unreachable.");
     }
@@ -178,10 +195,10 @@ private:
     Token op;
     switch (getChoice2()) {
     case Choice::A:
-      op = Token{Token::Type::SLASH, "/"};
+      op = Token{Token::Type::SLASH, "/", "/"};
       break;
     case Choice::B:
-      op = Token{Token::Type::STAR, "*"};
+      op = Token{Token::Type::STAR, "*", "*"};
       break;
     default:
       throw std::range_error(
@@ -192,9 +209,13 @@ private:
     case Kleene::ZERO:
       return unary();
       break;
-    case Kleene::MORE:
-      return Binary::make(unary(), op, unary());
+    case Kleene::MORE: {
+      ExprPtr lhs = unary();
+      m_tokens.push_back(op);
+      ExprPtr rhs = unary();
+      return Binary::make(std::move(lhs), op, std::move(rhs));
       break;
+    }
     default:
       throw std::range_error("Unreachable.");
     }
@@ -202,13 +223,19 @@ private:
 
   // unary → ("!" | "-") unary | primary;
   ExprPtr unary() {
+    if (m_depth >= m_max_depth) {
+      return primary();
+    } else {
+      ++m_depth;
+    }
+
     Token op;
     switch (getChoice2()) {
     case Choice::A:
-      op = Token{Token::Type::BANG, "!"};
+      op = Token{Token::Type::BANG, "!", "!"};
       break;
     case Choice::B:
-      op = Token{Token::Type::MINUS, "-"};
+      op = Token{Token::Type::MINUS, "-", "-"};
       break;
     default:
       throw std::range_error(
@@ -216,11 +243,14 @@ private:
     }
 
     switch (getChoice2()) {
-    case Choice::A:
+
+    case Choice::A: {
+      m_tokens.push_back(op);
       return Unary::make(op, unary());
       break;
+    }
     case Choice::B:
-      return Binary::make(unary(), op, unary());
+      return primary();
       break;
     default:
       throw std::range_error("Unary generator called with invalid Choice.");
@@ -231,24 +261,43 @@ private:
   ExprPtr primary() {
     switch (getChoice6()) {
 
-    case Choice::A:
-      return Number::make(getDouble());
+    case Choice::A: {
+      double value = getDouble();
+      m_tokens.emplace_back(Token::Type::NUMBER, fmt::format("{:g}", value),
+                            value);
+      return Number::make(value);
       break;
-    case Choice::B:
-      return String::make("some string @#!");
+    }
+    case Choice::B: {
+      static std::string string_literal = "some string @#!";
+      m_tokens.emplace_back(Token::Type::STRING,
+                            fmt::format("\"{}\"", string_literal),
+                            string_literal);
+      return String::make(string_literal);
       break;
-    case Choice::C:
+    }
+    case Choice::C: {
+      m_tokens.emplace_back(Token::Type::TRUE, "true");
       return Boolean::make(true);
       break;
-    case Choice::D:
+    }
+    case Choice::D: {
+      m_tokens.emplace_back(Token::Type::FALSE, "false");
       return Boolean::make(false);
       break;
-    case Choice::E:
+    }
+    case Choice::E: {
+      m_tokens.emplace_back(Token::Type::NIL, "NIL");
       return Nil::make();
       break;
-    case Choice::F:
-      return Grouping::make(expression());
+    }
+    case Choice::F: {
+      m_tokens.emplace_back(Token::Type::LEFT_PAREN, "(", "(");
+      ExprPtr expr = expression();
+      m_tokens.emplace_back(Token::Type::RIGHT_PAREN, ")", ")");
+      return Grouping::make(std::move(expr));
       break;
+    }
     default:
       throw std::range_error("Primary generator called with invalid Choice.");
     }
@@ -315,14 +364,22 @@ private:
           Catch::Generators::random(0, 1));
   int m_depth{0};
   int m_max_depth{50};
+  std::vector<Token> m_tokens{};
 };
 
 TEST_CASE("test catch gen", "[test]") {
   AstGenerator gen{};
-  ExprPtr expr = gen.generate();
-  REQUIRE(false);
-  Printer{}.print(expr.get());
-  REQUIRE(false);
+  auto [tokens, expected_ast] = gen.generate();
+  fmt::println("Tokens: {}", tokens);
+  fmt::println("Expected Expression:");
+  Printer{}.print(expected_ast.get());
+  REQUIRE(not tokens.empty());
+  Parser parser{tokens};
+  tl::expected result = parser.parse();
+  REQUIRE(result);
+  fmt::println("Parsed Expression:");
+  Printer{}.print(result.value().get());
+  REQUIRE(expected_ast.get()->equals(*result.value().get()));
 }
 
 std::vector<Token> scan_tokens(std::string_view input) {
