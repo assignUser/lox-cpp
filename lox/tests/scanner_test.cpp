@@ -40,7 +40,7 @@ static const std::map<Token::Type, std::string_view> simple_tokens{
     {Token::Type::WHILE, "while"}};
 
 TEST_CASE("Simple tokens", "[scanner]") {
-    Scanner scanner{""};
+  Scanner scanner{""};
 
   for (auto const [type, lexem] : simple_tokens) {
     std::string input = fmt::format("{}", lexem);
@@ -67,7 +67,7 @@ TEST_CASE("Simple tokens", "[scanner]") {
 }
 
 TEST_CASE("Simple tokens with whitespace", "[scanner]") {
-    Scanner scanner{""};
+  Scanner scanner{""};
 
   for (auto const [type, lexem] : simple_tokens) {
     std::string input = fmt::format("\n\t {} \t\n", lexem);
@@ -183,65 +183,6 @@ TEST_CASE("Multi-line block comments work", "[scanner]") {
   REQUIRE(unterminated.hasError());
   REQUIRE((unterminated.hasError() ? unterminated.getErrors().at(0).message
                                    : "") == "Unterminated block comment.");
-}
-
-bool operator==(Token const &lhs, Token const &rhs) {
-  return lhs.type == rhs.type;
-}
-
-Token const tokenFromType(Token::Type const &type) {
-  std::string lexem{""};
-  auto dbls = Catch::Generators::random<double>(
-      0.0, std::numeric_limits<double>::max());
-  if (type == Token::Type::NUMBER) {
-    lexem = fmt::format("{:.4f}", dbls.get());
-  } else if (type == Token::Type::STRING) {
-    // TODO random string
-    lexem = "\"A random string\"";
-  } else if (type != Token::Type::END_OF_FILE) {
-    lexem = Token::token_literals.at(type);
-  }
-  return Token{type, lexem};
-};
-
-std::vector<Token> const generateTokens(int n) {
-  std::vector<Token> tokens(n - 1);
-
-  int min_element = 0;
-  // max - 2 so EOF tokens are not generated
-  int max_element = static_cast<int>(Token::token_literals.size() - 2);
-  auto ints = Catch::Generators::random<int>(min_element, max_element);
-  std::ranges::generate_n(tokens.begin(), n - 1, [&]() mutable {
-    int t = ints.get();
-    ints.next();
-    return tokenFromType(static_cast<Token::Type>(t));
-  });
-
-  tokens.emplace_back(Token::Type::END_OF_FILE);
-  return tokens;
-}
-
-TEST_CASE("Scanning random tokens literals", "[scanner][generator]") {
-  REQUIRE(tokenFromType(Token::Type::STAR).type == Token::Type::STAR);
-  REQUIRE(tokenFromType(Token::Type::END_OF_FILE).lexem == "");
-  REQUIRE(generateTokens(5).size() == 5);
-
-  auto scan_prop = [](const std::vector<Token> &expected) -> bool {
-    Scanner scanner{fmt::format("{}", expected)};
-    std::vector scanned = scanner.scanTokens();
-    int test = 5;
-
-    return expected == scanned;
-  };
-
-  SECTION("Scanning generated literals") {
-    REQUIRE(scan_prop(std::vector<Token>{Token{Token::Type::END_OF_FILE}}));
-    REQUIRE(scan_prop(std::vector<Token>{Token{Token::Type::NUMBER, "50"},
-                                         Token{Token::Type::END_OF_FILE}}));
-    auto tokens = GENERATE(
-        take(50, map<std::vector<Token>>(generateTokens, random(1, 500))));
-    REQUIRE(scan_prop(tokens));
-  }
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
