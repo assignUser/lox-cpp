@@ -5,6 +5,7 @@
 
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "lox/error.hpp"
@@ -15,13 +16,17 @@ public:
   explicit Scanner(std::string_view sources) : m_source{sources} {}
 
   [[nodiscard]] std::vector<Token> scanTokens();
+  [[nodiscard]] std::vector<Token> scanTokens(std::string_view source){
+    m_source = source;
+    return scanTokens();
+  };
 
   bool hasError() { return not m_errors.empty(); }
   std::vector<Error> &getErrors() { return m_errors; }
   void clear() {
     m_start = 0;
     m_current = 0;
-    m_line = 0;
+    m_line = 1;
     m_source.clear();
     m_tokens.clear();
     m_errors.clear();
