@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
 
+#include <catch2/internal/catch_unique_ptr.hpp>
+#include <functional>
 #include <limits>
 #include <stdexcept>
 #include <string_view>
@@ -31,7 +33,7 @@ public:
   Printer &operator=(Printer &&) = delete;
   ~Printer() override = default;
 
-  void print(Expr *expr) {
+  void print(Expr const *expr) {
     expr->accept(*this);
 
     fmt::println("{}", m_str);
@@ -74,19 +76,37 @@ private:
   std::string m_str{""};
 };
 
-class AstGenerator {
+namespace {
+using ExprResult = std::tuple<std::reference_wrapper<std::vector<Token> const>,
+                              std::reference_wrapper<Expr const>>;
+class ExprGenerator : public Catch::Generators::IGenerator<ExprResult> {
 public:
-  std::tuple<std::vector<Token>, ExprPtr> generate() {
-    ExprPtr ast = expression();
+  bool next() override {
+    m_tokens.clear();
+    m_current_expr = expression();
     if (m_tokens.back().type != Token::Type::END_OF_FILE) {
       m_tokens.emplace_back(Token::Type::END_OF_FILE);
     }
-    return std::make_tuple(m_tokens, std::move(ast));
+    m_current_result =
+        std::make_tuple(std::cref(m_tokens), std::cref(*m_current_expr));
+    return true;
   }
 
-  // private:
+  ExprResult const &get() const override { return m_current_result; }
+  explicit ExprGenerator(int max_depth = 50) : m_max_depth{max_depth} {
+    static_cast<void>(next());
+  }
+
+private:
   enum class Kleene { ZERO, MORE };
   enum class Choice { A, B, C, D, E, F, G };
+
+  int m_depth{0};
+  int m_max_depth{50};
+  std::vector<Token> m_tokens{};
+  ExprPtr m_current_expr{};
+  ExprResult m_current_result{
+      std::tuple(std::cref(m_tokens), std::cref(*m_current_expr))};
 
   //  expression -> equality*
   ExprPtr expression() { return equality(); }
@@ -362,24 +382,31 @@ public:
       Catch::Generators::map(
           [](int value) { return static_cast<Kleene>(value); },
           Catch::Generators::random(0, 1));
-  int m_depth{0};
-  int m_max_depth{50};
-  std::vector<Token> m_tokens{};
 };
 
-TEST_CASE("test catch gen", "[test]") {
-  AstGenerator gen{};
-  auto [tokens, expected_ast] = gen.generate();
-  fmt::println("Tokens: {}", tokens);
+Catch::Generators::GeneratorWrapper<ExprResult> expression(int max_depth = 50) {
+  return {Catch::Detail::make_unique<ExprGenerator>(max_depth)};
+}
+} // namespace
+
+TEST_CASE("Parse generated expressions", "[Parser]") {
+  ExprResult result_tpl = GENERATE(take(100,expression())); 
+  std::vector<Token> const &tokens = std::get<0>(result_tpl);
+  Expr const &expected_ast = std::get<1>(result_tpl);
+
+  fmt::println("Tokens:\n{}", tokens);
   fmt::println("Expected Expression:");
-  Printer{}.print(expected_ast.get());
+  Printer{}.print(&expected_ast);
   REQUIRE(not tokens.empty());
+
   Parser parser{tokens};
   tl::expected result = parser.parse();
+
   REQUIRE(result);
   fmt::println("Parsed Expression:");
   Printer{}.print(result.value().get());
-  REQUIRE(expected_ast.get()->equals(*result.value().get()));
+
+  REQUIRE(expected_ast.equals(*result.value().get()));
 }
 
 std::vector<Token> scan_tokens(std::string_view input) {
