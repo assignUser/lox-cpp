@@ -8,9 +8,9 @@
 
 #include "lox/error.hpp"
 
-void Interpreter::eval(Expr *expr) { expr->accept(*this); }
+void Interpreter::eval(Expr const* expr) { expr->accept(*this); }
 
-Expr const &Interpreter::evaluate(Expr *expr) {
+Expr const &Interpreter::evaluate(Expr const*expr) {
   try {
     eval(expr);
     if (isA<String>(*m_result)) {
@@ -28,6 +28,7 @@ Expr const &Interpreter::evaluate(Expr *expr) {
     }
 
   } catch (Error e) {
+    m_hasError = true;
     report(e);
     m_result = Nil::make();
   }
@@ -142,16 +143,20 @@ void Interpreter::visit(Unary const &expr) {
     if (isA<Number>(*rhs)) {
       m_result = Number::make(-expr_as<Number>(*rhs).value);
     } else {
-      throw; // TODO proper error
+      throw   Error{
+          0, "",
+          fmt::format("Invalid operand '{}' for unary '-'.", rhs->getKind())};
     }
 
   } else if (expr.op.type == Token::Type::BANG) {
-    // this currently ignores the actual value and just
-    // goes by nil, flase = falsey, else = truthy
+    //TODO: this currently ignores the actual value and just
+    // goes by nil, false = falsey, else = truthy
     // e.g. !(false) = false instead of true because Grouping is truthy
     m_result = Boolean::make(not rhs->truthy());
   } else {
-    throw; // TODO proper error
+      throw   Error{
+          0, "",
+          fmt::format("Invalid operator '{}' for unary expression.", expr.op.type)};
   }
 }
 
