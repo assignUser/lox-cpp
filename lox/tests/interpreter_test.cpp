@@ -347,8 +347,6 @@ private:
       }
     }
 
-    fmt::println("m_depth = {}", m_depth);
-
     switch (getChoice6()) {
     case Choice::A: {
       return Number::make(getDouble());
