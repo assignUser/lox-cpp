@@ -3,9 +3,10 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
 
-#include <catch2/internal/catch_unique_ptr.hpp>
+#include <algorithm>
 #include <functional>
 #include <limits>
+#include <numeric>
 #include <stdexcept>
 #include <string_view>
 
@@ -13,6 +14,7 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
+#include <catch2/internal/catch_unique_ptr.hpp>
 #include <fmt/core.h>
 #include <tl/expected.hpp>
 #include <tuple>
@@ -23,8 +25,62 @@
 #include "lox/scanner.hpp"
 
 using std::string_view_literals::operator""sv;
+class Counter : public Visitor {
+  std::map<std::string, int> m_counts{};
+  void incrementCount(std::string const &name) {
+    if (m_counts.contains(name)) {
+      ++m_counts.at(name);
+    } else {
+      m_counts.insert({name, 1});
+    }
+  }
+
+public:
+  Counter() = default;
+  Counter(const Counter &) = default;
+  Counter(Counter &&) = delete;
+  Counter &operator=(const Counter &) = default;
+  Counter &operator=(Counter &&) = delete;
+  ~Counter() override = default;
+
+  void count(Expr const *expr) { expr->accept(*this); }
+  std::string getCounts() {
+    return std::accumulate(
+        m_counts.begin(), m_counts.end(), std::string{},
+        [](std::string counts, std::pair<std::string, int> const &pair) {
+          return std::move(counts) +
+                 fmt::format("{}: {}\n", pair.first, pair.second);
+        });
+  }
+  bool countsValid() {
+    // Expression and Print not generated/implemented so 7
+    return m_counts.size() == 7 &&
+           std::all_of(m_counts.begin(), m_counts.end(),
+                       [](auto const &pair) { return pair.second > 0; });
+  }
+  void visit(Binary const &expr) override {
+    incrementCount("Binary");
+    expr.lhs->accept(*this);
+    expr.rhs->accept(*this);
+  }
+  void visit(Grouping const &expr) override {
+    incrementCount("Grouping");
+    expr.expr->accept(*this);
+  }
+  void visit(String const &expr) override { incrementCount("String"); }
+  void visit(Number const &expr) override { incrementCount("Number"); }
+  void visit(Unary const &expr) override {
+    incrementCount("Unary");
+    expr.expr->accept(*this);
+  }
+  void visit(Boolean const &expr) override { incrementCount("Boolean"); }
+  void visit(Nil const &expr) override { incrementCount("Nil"); }
+  void visit(Expression const &expr) override { incrementCount("Expression"); }
+  void visit(Print const &expr) override { incrementCount("Print"); }
+};
 
 class Printer : public Visitor {
+
 public:
   Printer() = default;
   Printer(const Printer &) = default;
@@ -389,8 +445,23 @@ Catch::Generators::GeneratorWrapper<ExprResult> expression(int max_depth = 50) {
 }
 } // namespace
 
+TEST_CASE("Test ExprGenerator Distribution", "[Generators]") {
+  SKIP();//Dialed in the ~ number to reliably generate everything
+  static Counter overall_counter{};
+  SECTION("Generate Expressions") {
+    ExprResult result_tpl = GENERATE(take(10000, expression()));
+    Expr const *generated_expr = &std::get<1>(result_tpl).get();
+    Counter inner_counter{};
+    overall_counter.count(generated_expr);
+    inner_counter.count(generated_expr);
+    fmt::println("One:\n{}", inner_counter.getCounts());
+  }
+  fmt::println("Total:\n{}", overall_counter.getCounts());
+  CHECK(overall_counter.countsValid());
+}
+
 TEST_CASE("Parse generated expressions", "[Parser]") {
-  ExprResult result_tpl = GENERATE(take(100,expression())); 
+  ExprResult result_tpl = GENERATE(take(10000, expression()));
   std::vector<Token> const &tokens = std::get<0>(result_tpl);
   Expr const &expected_ast = std::get<1>(result_tpl);
 
@@ -409,42 +480,16 @@ TEST_CASE("Parse generated expressions", "[Parser]") {
   REQUIRE(expected_ast.equals(*result.value().get()));
 }
 
-std::vector<Token> scan_tokens(std::string_view input) {
-  Scanner scanner{input};
-  return {scanner.scanTokens()};
-}
-
-TEST_CASE("Parser correctly parses literals", "[Parser]") {
-  std::vector<Token> tokens = scan_tokens("true");
-  Parser parser(tokens);
-
-  auto result = parser.parse();
-  REQUIRE(result.has_value());
-  REQUIRE(result.value()->getKind() == Expr::ExprKind::Boolean);
-}
-
 TEST_CASE("Parser handles syntax errors", "[Parser]") {
-  std::vector<Token> tokens = scan_tokens("if (true {}");
+  std::vector<Token> tokens{
+      {Token::Type::IF},          {Token::Type::LEFT_PAREN},
+      {Token::Type::TRUE},        {Token::Type::LEFT_BRACE},
+      {Token::Type::RIGHT_BRACE}, {Token::Type::END_OF_FILE}};
   Parser parser(tokens);
 
   auto result = parser.parse();
   REQUIRE_FALSE(result.has_value());
   // REQUIRE(result.error().code() == Error::Type::SyntaxError);
-}
-
-TEST_CASE("Parser parses complex expressions", "[Parser]") {
-  std::vector<Token> tokens = scan_tokens("1 + 2 * 3");
-  Parser parser(tokens);
-
-  auto result = parser.parse();
-  REQUIRE(result.has_value());
-
-  auto expr = dynamic_cast<Binary *>(result.value().get());
-  REQUIRE(expr);
-  REQUIRE(expr->op.type == Token::Type::PLUS);
-  REQUIRE(dynamic_cast<Number *>(expr->lhs.get())->value == 1);
-  REQUIRE(dynamic_cast<Binary *>(expr->rhs.get())->op.type ==
-          Token::Type::STAR);
 }
 
 TEST_CASE("Parser handles empty input", "[Parser]") {
