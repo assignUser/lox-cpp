@@ -45,4 +45,4 @@ CheckOptions:
   - key:             readability-identifier-naming.VariableCase
     value:           lower_case
   - key:             readability-identifier-naming.IgnoreMainLikeFunctions
-    value:           1delines-*
+    value:           1

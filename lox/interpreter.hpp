@@ -6,7 +6,8 @@
 
 class Interpreter : public Visitor {
 public:
-  Expr const& evaluate(Expr *expr);
+  Expr const &evaluate(Expr const *expr);
+  bool hasError() { return m_hasError; }
 
   void visit(Binary const &expr) override;
   void visit(Boolean const &expr) override;
@@ -19,7 +20,8 @@ public:
   void visit(Print const &expr) override;
 
 private:
-  void eval(Expr *expr);
+  void eval(Expr const *expr);
   ExprPtr m_result;
   ExprPtr m_tmp;
+  bool m_hasError{false};
 };

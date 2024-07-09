@@ -19,8 +19,8 @@ function(configure_target target)
   endif()
 endfunction()
 
+message(STATUS "Getting dependencies...")
 include(FetchContent)
-
 set(EXPECTED_BUILD_TESTS OFF)
 set(OPTIONAL_BUILD_TESTS OFF)
 FetchContent_Declare(

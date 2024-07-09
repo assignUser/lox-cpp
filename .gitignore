@@ -31,5 +31,6 @@
 *.out
 *.app
 build
-.cache/clangd/index
+.cache
+.ccache
 Testing/Temporary
