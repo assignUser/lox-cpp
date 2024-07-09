@@ -1,8 +1,13 @@
 # vim: set filetype=just :
 default: workflow
 
+root := `pwd`
 export CMAKE_EXPORT_COMPILE_COMMANDS := "ON"
 export CMAKE_GENERATOR := "Ninja"
+export CCACHE_DIR := root + "/.ccache"
+
+ccache:
+  ccache -sv
 
 clean:
   cmake --workflow --preset clean
