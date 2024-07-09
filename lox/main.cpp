@@ -94,7 +94,9 @@ tl::expected<int, Error> run(std::string_view source) {
     return tl::unexpected(expression.error());
   } else {
     Printer{}.print(expression->get());
-    Interpreter{}.evaluate(expression.value().get());
+    static Interpreter interpreter{}; 
+    interpreter.evaluate(expression.value().get());
+    // TODO pass on error via expected.
   }
 
   return 0;
@@ -157,6 +159,7 @@ int main(int argc, char **argv) {
 
   if (not result) {
     report(result.error());
+    // TODO exit codes
     std::exit(1);
   }
   return 0;
