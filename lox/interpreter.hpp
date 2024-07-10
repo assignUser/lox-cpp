@@ -8,6 +8,11 @@ class Interpreter : public Visitor {
 public:
   Expr const &evaluate(Expr const *expr);
   bool hasError() { return m_hasError; }
+  void clear() {
+    m_result.reset();
+    m_tmp.reset();
+    m_hasError = false;
+  }
 
   void visit(Binary const &expr) override;
   void visit(Boolean const &expr) override;
