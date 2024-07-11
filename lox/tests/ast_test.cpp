@@ -16,7 +16,7 @@ TEMPLATE_TEST_CASE("classof works (negative)", "[ast]", Binary, Boolean,
   REQUIRE(not isA<TestType>(*num));
 }
 
-TEST_CASE("equals works", "[ast]"){
+TEST_CASE("equals works", "[ast]") {
   auto nil = Nil::make();
 
   auto yes = Boolean::make(true);
@@ -30,12 +30,17 @@ TEST_CASE("equals works", "[ast]"){
   auto num2 = Number::make(42);
   auto num3 = Number::make(43);
 
-  auto bin1 = Binary::make(Number::make(23), Token{Token::Type::PLUS, "+"}, Number::make(42));
-  auto bin2 = Binary::make(Number::make(23), Token{Token::Type::PLUS, "+"}, Number::make(42));
-  auto bin3 = Binary::make(String::make("blub"), Token{Token::Type::PLUS, "+"}, Number::make(42));
+  auto bin1 = Binary::make(Number::make(23), Token{Token::Type::PLUS, "+"},
+                           Number::make(42));
+  auto bin2 = Binary::make(Number::make(23), Token{Token::Type::PLUS, "+"},
+                           Number::make(42));
+  auto bin3 = Binary::make(String::make("blub"), Token{Token::Type::PLUS, "+"},
+                           Number::make(42));
 
-  auto grp1 = Grouping::make(Binary::make(String::make("blub"), Token{Token::Type::PLUS, "+"}, Number::make(42)));
-  auto grp2 = Grouping::make(Binary::make(String::make("blub"), Token{Token::Type::PLUS, "+"}, Number::make(42)));
+  auto grp1 = Grouping::make(Binary::make(
+      String::make("blub"), Token{Token::Type::PLUS, "+"}, Number::make(42)));
+  auto grp2 = Grouping::make(Binary::make(
+      String::make("blub"), Token{Token::Type::PLUS, "+"}, Number::make(42)));
   auto grp3 = Grouping::make(Number::make(43));
 
   auto ury1 = Unary::make(Token{Token::Type::BANG, "!"}, Boolean::make(false));
@@ -43,35 +48,35 @@ TEST_CASE("equals works", "[ast]"){
   auto ury3 = Unary::make(Token{Token::Type::BANG, "!"}, Boolean::make(true));
 
   REQUIRE(nil->equals(*nil));
-  REQUIRE(not nil->equals(*yes));
+  REQUIRE_FALSE(nil->equals(*yes));
 
   REQUIRE(yes->equals(*yes));
-  REQUIRE(not yes->equals(*no));
-  REQUIRE(not yes->equals(*nil));
+  REQUIRE_FALSE(yes->equals(*no));
+  REQUIRE_FALSE(yes->equals(*nil));
 
   REQUIRE(str1->equals(*str2));
   REQUIRE(str1->equals(*str1));
-  REQUIRE(not str1->equals(*str3));
-  REQUIRE(not str1->equals(*num1));
+  REQUIRE_FALSE(str1->equals(*str3));
+  REQUIRE_FALSE(str1->equals(*num1));
 
   REQUIRE(num1->equals(*num1));
   REQUIRE(num1->equals(*num2));
-  REQUIRE(not num1->equals(*num3));
-  REQUIRE(not num1->equals(*bin1));
+  REQUIRE_FALSE(num1->equals(*num3));
+  REQUIRE_FALSE(num1->equals(*bin1));
 
   REQUIRE(bin1->equals(*bin1));
   REQUIRE(bin1->equals(*bin2));
-  REQUIRE(not bin2->equals(*bin3));
-  REQUIRE(not bin2->equals(*str1));
+  REQUIRE_FALSE(bin2->equals(*bin3));
+  REQUIRE_FALSE(bin2->equals(*str1));
 
   REQUIRE(grp1->equals(*grp1));
   REQUIRE(grp1->equals(*grp2));
-  REQUIRE(not grp1->equals(*grp3));
-  REQUIRE(not grp1->equals(*num1));
+  REQUIRE_FALSE(grp1->equals(*grp3));
+  REQUIRE_FALSE(grp1->equals(*num1));
 
   REQUIRE(ury1->equals(*ury1));
   REQUIRE(ury1->equals(*ury2));
-  REQUIRE(not ury1->equals(*ury3));
-  REQUIRE(not ury1->equals(*str1));
+  REQUIRE_FALSE(ury1->equals(*ury3));
+  REQUIRE_FALSE(ury1->equals(*str1));
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
