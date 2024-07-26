@@ -83,8 +83,7 @@ const static std::map<Expr::ExprKind, std::string_view> expr_kind_literals{
 template <>
 struct fmt::formatter<Expr::ExprKind> : fmt::formatter<std::string_view> {
   auto format(const Expr::ExprKind &e, format_context &ctx) const {
-    return formatter<std::string_view>::format(expr_kind_literals.at(e),
-                                               ctx);
+    return formatter<std::string_view>::format(expr_kind_literals.at(e), ctx);
   }
 };
 
@@ -146,6 +145,7 @@ public:
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Grouping;
   }
+  [[nodiscard]] bool truthy() const override { return expr->truthy(); }
   std::unique_ptr<Expr> expr;
 
 private:
