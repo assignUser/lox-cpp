@@ -31,7 +31,7 @@ Token const &Parser::consume(Token::Type type, std::string const &message) {
 Error Parser::error(Token const& token, std::string const &message) {
   Error error = token.type == Token::Type::END_OF_FILE
                     ? Error{token.line, "at end", message}
-                    : Error{token.line, "at '" + token.lexeme + "'", message};
+                    : Error{token.line, "at '" + token.lexem + "'", message};
   report(error);
   return error;
 }

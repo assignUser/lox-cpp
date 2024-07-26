@@ -5,10 +5,9 @@
 
 #include <charconv>
 #include <fmt/format.h>
-#include <stdexcept>
 
 void Scanner::addToken(Token::Type type,
-                       std::variant<std::string, double> literal) {
+                       std::variant<std::string, double> const &literal) {
   auto text{m_source.substr(m_start, m_current - m_start)};
   m_tokens.emplace_back(type, text, literal, m_line);
 }
@@ -37,9 +36,9 @@ void Scanner::identifier() {
   }
   Token::Type type{Token::Type::IDENTIFIER};
 
-  std::string lexeme = m_source.substr(m_start, m_current - m_start);
-  if (Token::keywords.contains(lexeme)) {
-    type = Token::keywords.at(lexeme);
+  std::string lexem = m_source.substr(m_start, m_current - m_start);
+  if (Token::keywords.contains(lexem)) {
+    type = Token::keywords.at(lexem);
   }
   addToken(type);
 }
@@ -68,8 +67,9 @@ void Scanner::number() {
   }
 
   double number{};
-  auto [ptr, ec] = std::from_chars(m_source.data() + m_start,
-                                   m_source.data() + m_current, number);
+  auto [ptr, ec] =
+      std::from_chars(std::next(m_source.data(), m_start),
+                      std::next(m_source.data(), m_current), number);
   if (ec == std::errc()) {
     addToken(Token::Type::NUMBER, number);
   } else if (ec == std::errc::invalid_argument) {
@@ -211,54 +211,3 @@ void Scanner::scanToken() {
     break;
   }
 }
-
-const std::map<std::string_view, Token::Type> Token::keywords{
-    {"and", Token::Type::AND},       {"class", Token::Type::CLASS},
-    {"else", Token::Type::ELSE},     {"false", Token::Type::FALSE},
-    {"fun", Token::Type::FUN},       {"for", Token::Type::FOR},
-    {"if", Token::Type::IF},         {"nil", Token::Type::NIL},
-    {"or", Token::Type::OR},         {"print", Token::Type::PRINT},
-    {"return", Token::Type::RETURN}, {"super", Token::Type::SUPER},
-    {"this", Token::Type::THIS},     {"true", Token::Type::TRUE},
-    {"var", Token::Type::VAR},       {"while", Token::Type::WHILE}};
-
-const std::map<Token::Type, std::string_view> Token::token_literals{
-    {Token::Type::LEFT_PAREN, "("},
-    {Token::Type::RIGHT_PAREN, ")"},
-    {Token::Type::LEFT_BRACE, "{Token::Type::"},
-    {Token::Type::RIGHT_BRACE, "}"},
-    {Token::Type::COMMA, ","},
-    {Token::Type::DOT, "."},
-    {Token::Type::MINUS, "-"},
-    {Token::Type::PLUS, "+"},
-    {Token::Type::SEMICOLON, ";"},
-    {Token::Type::SLASH, "/"},
-    {Token::Type::STAR, "*"},
-    {Token::Type::BANG, "!"},
-    {Token::Type::BANG_EQUAL, "!="},
-    {Token::Type::EQUAL, "="},
-    {Token::Type::EQUAL_EQUAL, "=="},
-    {Token::Type::GREATER, ">"},
-    {Token::Type::GREATER_EQUAL, ">="},
-    {Token::Type::LESS, "<"},
-    {Token::Type::LESS_EQUAL, "<="},
-    {Token::Type::IDENTIFIER, "Identifier"},
-    {Token::Type::STRING, "String"},
-    {Token::Type::NUMBER, "Number"},
-    {Token::Type::AND, "and"},
-    {Token::Type::CLASS, "class"},
-    {Token::Type::ELSE, "else"},
-    {Token::Type::FALSE, "false"},
-    {Token::Type::FUN, "fun"},
-    {Token::Type::FOR, "for"},
-    {Token::Type::IF, "if"},
-    {Token::Type::NIL, "nil"},
-    {Token::Type::OR, "or"},
-    {Token::Type::PRINT, "print"},
-    {Token::Type::RETURN, "return"},
-    {Token::Type::SUPER, "super"},
-    {Token::Type::THIS, "this"},
-    {Token::Type::TRUE, "true"},
-    {Token::Type::VAR, "var"},
-    {Token::Type::WHILE, "while"},
-    {Token::Type::END_OF_FILE, "END_OF_FILE"}};
