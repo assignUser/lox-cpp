@@ -59,6 +59,17 @@ TEST_CASE("Unary", "[interpreter]") {
     REQUIRE(expr_as<Boolean>(result_true).value);
   }
 
+  SECTION("!(!false)") {
+    lox.clear();
+    ExprPtr not_group = Unary::make(Token{Token::Type::BANG, "!"},
+                                    Grouping::make(bangUnary(false)));
+    INFO(fmt::format("Expression: {}\n", Printer{}.print(not_group.get())));
+
+    Expr const &result_false = lox.evaluate(not_group.get());
+    REQUIRE(not lox.hasError());
+    REQUIRE_FALSE(expr_as<Boolean>(result_false).value);
+  }
+
   SECTION("!!false") {
     lox.clear();
     ExprPtr not_not_false =
@@ -223,8 +234,8 @@ TEST_CASE("Binary", "[interpreter]") {
 
   SECTION("Number == Number - true") {
     lox.clear();
-    ExprPtr expr = Binary::make(Number::make(2), Token{Token::Type::EQUAL_EQUAL},
-                                Number::make(2));
+    ExprPtr expr = Binary::make(
+        Number::make(2), Token{Token::Type::EQUAL_EQUAL}, Number::make(2));
     Expr const &result = lox.evaluate(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Boolean>(result).value);
@@ -232,8 +243,8 @@ TEST_CASE("Binary", "[interpreter]") {
 
   SECTION("Number == Number - false") {
     lox.clear();
-    ExprPtr expr = Binary::make(Number::make(6), Token{Token::Type::EQUAL_EQUAL},
-                                Number::make(2));
+    ExprPtr expr = Binary::make(
+        Number::make(6), Token{Token::Type::EQUAL_EQUAL}, Number::make(2));
     Expr const &result = lox.evaluate(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result).value);
@@ -261,8 +272,9 @@ TEST_CASE("Binary", "[interpreter]") {
     // Check that equals is called correctly, all other combinations are tested
     // in ast_test.cpp
     lox.clear();
-    ExprPtr expr = Binary::make(Number::make(6), Token{Token::Type::EQUAL_EQUAL},
-                                String::make("a string"));
+    ExprPtr expr =
+        Binary::make(Number::make(6), Token{Token::Type::EQUAL_EQUAL},
+                     String::make("a string"));
     Expr const &result = lox.evaluate(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result).value);
