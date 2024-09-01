@@ -67,13 +67,14 @@ void Parser::synchronize() {
   }
 }
 
-std::vector<StmtPtr> Parser::parse() {
+tl::expected<std::vector<StmtPtr>, Error> Parser::parse() {
   std::vector<StmtPtr> statements{};
   try {
-  while (not atEnd()) {
-    statements.push_back(statement());
-  }
+    while (not atEnd()) {
+      statements.push_back(statement());
+    }
   } catch (Error e) {
+    return tl::unexpected(e);
   }
   return statements;
 }

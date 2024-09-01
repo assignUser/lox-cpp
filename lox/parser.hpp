@@ -17,7 +17,7 @@
 
 class Parser {
 public:
-  std::vector<StmtPtr> parse();
+  tl::expected<std::vector<StmtPtr>, Error> parse();
   explicit Parser(std::vector<Token> tokens) : m_tokens{std::move(tokens)} {}
 
 private:

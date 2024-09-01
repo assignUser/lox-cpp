@@ -90,13 +90,15 @@ tl::expected<int, Error> run(std::string_view source) {
   }
 
   auto parser = Parser{tokens};
-  std::vector<StmtPtr> statements = parser.parse();
+  tl::expected<std::vector<StmtPtr>, Error> statements = parser.parse();
+  if (not statements) {
+    return tl::unexpected(statements.error());
+  }
 
   static Interpreter interpreter{};
-  interpreter.interpret(statements);
+  interpreter.interpret(statements.value());
   if (interpreter.hasError()) {
-  // TODO add error mgmt back in
-    return tl::unexpected(Error(0, "foo", "bar"));
+    return 1;
   }
 
   return 0;
@@ -161,5 +163,5 @@ int main(int argc, char **argv) {
     // TODO exit codes
     std::exit(1);
   }
-  return 0;
+  return result.value();
 }
