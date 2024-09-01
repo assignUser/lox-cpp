@@ -6,7 +6,7 @@
 
 #include "fmt/format.h"
 
-#include "lox/error.hpp"
+#include <fmt/core.h>
 #include <memory>
 
 void Interpreter::evaluate(Expr const *expr) { expr->accept(*this); }
@@ -27,6 +27,20 @@ Interpreter::interpret(std::vector<StmtPtr> const &statements) {
   ExprPtr res = std::move(m_result);
   m_result.reset();
   return res;
+}
+
+ExprPtr Interpreter::interpret(Expr const* expr){
+   try {
+    evaluate(expr);
+  } catch (Error e) {
+    m_hasError = true;
+    report(e);
+    m_result = Nil::make();
+  }
+
+  ExprPtr res = std::move(m_result);
+  m_result.reset();
+  return res; 
 }
 
 void Interpreter::visit(Binary const &expr) {

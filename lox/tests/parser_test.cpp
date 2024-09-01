@@ -95,6 +95,13 @@ public:
     fmt::println("{}", m_str);
   }
 
+  void print(std::vector<StmtPtr> const &stmts) {
+    for (auto const &stmt : stmts) {
+      stmt->accept(*this);
+      fmt::println("{}\n", m_str);
+    }
+  }
+
   void visit(Binary const &expr) override {
     expr.lhs->accept(*this);
     m_str += fmt::format(" {} ", expr.op.lexem);
@@ -141,6 +148,7 @@ public:
     m_tokens.clear();
     m_current_expr = expression();
     if (m_tokens.back().type != Token::Type::END_OF_FILE) {
+      m_tokens.emplace_back(Token::Type::SEMICOLON);
       m_tokens.emplace_back(Token::Type::END_OF_FILE);
     }
     m_current_result =
@@ -446,7 +454,7 @@ Catch::Generators::GeneratorWrapper<ExprResult> expression(int max_depth = 50) {
 } // namespace
 
 TEST_CASE("Test ExprGenerator Distribution", "[Generators]") {
-  SKIP();//Dialed in the ~ number to reliably generate everything
+  SKIP(); // Dialed in the ~ number to reliably generate everything
   static Counter overall_counter{};
   SECTION("Generate Expressions") {
     ExprResult result_tpl = GENERATE(take(10000, expression()));
@@ -475,9 +483,9 @@ TEST_CASE("Parse generated expressions", "[Parser]") {
 
   REQUIRE(result);
   fmt::println("Parsed Expression:");
-  Printer{}.print(result.value().get());
+  Printer{}.print(result.value());
 
-  REQUIRE(expected_ast.equals(*result.value().get()));
+  REQUIRE(expected_ast.equals(*stmt_as<Expression>(*result.value().front()).expr.get()));
 }
 
 TEST_CASE("Parser handles syntax errors", "[Parser]") {
@@ -497,6 +505,7 @@ TEST_CASE("Parser handles empty input", "[Parser]") {
   Parser parser(tokens);
 
   auto result = parser.parse();
-  REQUIRE_FALSE(result.has_value());
+  REQUIRE(result.has_value());
+  REQUIRE(result.value().empty());
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)

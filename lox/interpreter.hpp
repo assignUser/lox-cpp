@@ -3,10 +3,12 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 
 #include "lox/ast.hpp"
+#include "lox/error.hpp"
 
 class Interpreter : public Visitor {
 public:
   ExprPtr interpret(std::vector<StmtPtr> const &statements);
+  ExprPtr interpret(Expr const* expr);
   bool hasError() { return m_hasError; }
   void clear() {
     m_result.reset();

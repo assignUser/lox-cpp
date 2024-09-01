@@ -87,11 +87,7 @@ struct fmt::formatter<Expr::ExprKind> : fmt::formatter<std::string_view> {
   }
 };
 
-template <typename Derived> [[nodiscard]] bool isA(Expr const &expr) {
-  return Derived::classof(expr);
-}
-
-template <typename Derived> [[nodiscard]] bool isA(Stmt const &expr) {
+template <typename Derived, typename Base> [[nodiscard]] bool isA(Base const &expr) {
   return Derived::classof(expr);
 }
 
