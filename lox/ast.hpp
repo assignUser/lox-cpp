@@ -91,11 +91,22 @@ template <typename Derived> [[nodiscard]] bool isA(Expr const &expr) {
   return Derived::classof(expr);
 }
 
+template <typename Derived> [[nodiscard]] bool isA(Stmt const &expr) {
+  return Derived::classof(expr);
+}
+
 template <typename AsType> AsType const &expr_as(const Expr &expr) {
   if (not isA<AsType>(expr)) {
     throw std::runtime_error{"expr is not off matching type"};
   }
   return static_cast<AsType const &>(expr);
+}
+
+template <typename AsType> AsType const &stmt_as(const Stmt &stmt) {
+  if (not isA<AsType>(stmt)) {
+    throw std::runtime_error{"stmt is not off matching type"};
+  }
+  return static_cast<AsType const &>(stmt);
 }
 
 class Binary : public Expr {
@@ -278,7 +289,7 @@ public:
 
   virtual ~Stmt() = default;
   virtual void accept(Visitor &visitor) const = 0;
-  // [[nodiscard]] virtual bool equals(Stmt const &other) const = 0;
+  [[nodiscard]] virtual bool equals(Stmt const &other) const = 0;
   [[nodiscard]] StmtKind getKind() const { return m_kind; }
 
 private:
@@ -299,24 +310,46 @@ struct fmt::formatter<Stmt::StmtKind> : fmt::formatter<std::string_view> {
 
 class Expression : public Stmt {
 public:
-  explicit Expression(ExprPtr expr)
-      : Stmt(Stmt::StmtKind::Expression), expression{std::move(expr)} {}
+  [[nodiscard]] static std::unique_ptr<Stmt> make(std::unique_ptr<Expr> expr) {
+    return std::unique_ptr<Stmt>(new Expression{std::move(expr)});
+  }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Expression;
   }
+  [[nodiscard]] bool equals(Stmt const &other) const override {
+    if (not isA<Expression>(other)) {
+      return false;
+    }
+    return expr->equals(*stmt_as<Expression>(other).expr);
+  }
 
-  ExprPtr expression;
+  ExprPtr expr;
+
+private:
+  explicit Expression(ExprPtr expr)
+      : Stmt(Stmt::StmtKind::Expression), expr{std::move(expr)} {}
 };
 
 class Print : public Stmt {
 public:
-  explicit Print(ExprPtr expr)
-      : Stmt(Stmt::StmtKind::Print), expression{std::move(expr)} {}
+  [[nodiscard]] static std::unique_ptr<Stmt> make(std::unique_ptr<Expr> expr) {
+    return std::unique_ptr<Stmt>(new Print{std::move(expr)});
+  }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Print;
   }
+  [[nodiscard]] bool equals(Stmt const &other) const override {
+    if (not isA<Print>(other)) {
+      return false;
+    }
+    return expr->equals(*stmt_as<Print>(other).expr);
+  }
 
-  ExprPtr expression;
+  ExprPtr expr;
+
+private:
+  explicit Print(ExprPtr expr)
+      : Stmt(Stmt::StmtKind::Print), expr{std::move(expr)} {}
 };

@@ -7,39 +7,32 @@
 #include "fmt/format.h"
 
 #include "lox/error.hpp"
+#include <memory>
 
-void Interpreter::eval(Expr const* expr) { expr->accept(*this); }
+void Interpreter::evaluate(Expr const *expr) { expr->accept(*this); }
+void Interpreter::execute(Stmt const *stmt) { stmt->accept(*this); }
 
-Expr const &Interpreter::evaluate(Expr const*expr) {
+ExprPtr
+Interpreter::interpret(std::vector<std::unique_ptr<Stmt>> const &statements) {
   try {
-    eval(expr);
-    if (isA<String>(*m_result)) {
-      fmt::println("{}", expr_as<String>(*m_result).value);
-    } else if (isA<Number>(*m_result)) {
-      fmt::println("{}", expr_as<Number>(*m_result).value);
-    } else if (isA<Boolean>(*m_result)) {
-      fmt::println("{}", expr_as<Boolean>(*m_result).value);
-    } else if (isA<Nil>(*m_result)) {
-      fmt::println("Nil");
-    } else {
-      throw Error{
-          0, "",
-          fmt::format("Unexpected result type {}.", m_result->getKind())};
+    for (auto const &stmt : statements) {
+      execute(stmt.get());
     }
-
   } catch (Error e) {
     m_hasError = true;
     report(e);
     m_result = Nil::make();
   }
 
-  return *m_result;
+  ExprPtr res = std::move(m_result);
+  m_result.reset();
+  return res;
 }
 
 void Interpreter::visit(Binary const &expr) {
-  eval(expr.lhs.get());
+  evaluate(expr.lhs.get());
   ExprPtr lhs{std::move(m_result)};
-  eval(expr.rhs.get());
+  evaluate(expr.rhs.get());
   ExprPtr rhs{std::move(m_result)};
 
   switch (expr.op.type) {
@@ -122,7 +115,7 @@ void Interpreter::visit(Boolean const &expr) {
   m_result = Boolean::make(expr.value);
 }
 
-void Interpreter::visit(Grouping const &expr) { eval(expr.expr.get()); }
+void Interpreter::visit(Grouping const &expr) { evaluate(expr.expr.get()); }
 
 void Interpreter::visit(Nil const &expr) { m_result = Nil::make(); }
 
@@ -135,7 +128,7 @@ void Interpreter::visit(String const &expr) {
 }
 
 void Interpreter::visit(Unary const &expr) {
-  eval(expr.expr.get());
+  evaluate(expr.expr.get());
   // properly not needed here
   ExprPtr rhs{std::move(m_result)};
 
@@ -143,23 +136,36 @@ void Interpreter::visit(Unary const &expr) {
     if (isA<Number>(*rhs)) {
       m_result = Number::make(-expr_as<Number>(*rhs).value);
     } else {
-      throw   Error{
+      throw Error{
           0, "",
           fmt::format("Invalid operand '{}' for unary '-'.", rhs->getKind())};
     }
 
   } else if (expr.op.type == Token::Type::BANG) {
-    //TODO: this currently ignores the actual value and just
-    // goes by nil, false = falsey, else = truthy
-    // e.g. !(false) = false instead of true because Grouping is truthy
+    // TODO: this currently ignores the actual value and just
+    //  goes by nil, false = falsey, else = truthy
+    //  e.g. !(false) = false instead of true because Grouping is truthy
     m_result = Boolean::make(not rhs->truthy());
   } else {
-      throw   Error{
-          0, "",
-          fmt::format("Invalid operator '{}' for unary expression.", expr.op.type)};
+    throw Error{0, "",
+                fmt::format("Invalid operator '{}' for unary expression.",
+                            expr.op.type)};
   }
 }
 
-void Interpreter::visit(Expression const &expr) {;}
-void Interpreter::visit(Print const &expr) {;}
-
+void Interpreter::visit(Expression const &stmt) { evaluate(stmt.expr.get()); }
+void Interpreter::visit(Print const &stmt) {
+  evaluate(stmt.expr.get());
+  if (isA<String>(*m_result)) {
+    fmt::println("{}", expr_as<String>(*m_result).value);
+  } else if (isA<Number>(*m_result)) {
+    fmt::println("{}", expr_as<Number>(*m_result).value);
+  } else if (isA<Boolean>(*m_result)) {
+    fmt::println("{}", expr_as<Boolean>(*m_result).value);
+  } else if (isA<Nil>(*m_result)) {
+    fmt::println("Nil");
+  } else {
+    throw Error{0, "",
+                fmt::format("Unexpected result type {}.", m_result->getKind())};
+  }
+}

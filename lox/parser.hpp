@@ -17,7 +17,7 @@
 
 class Parser {
 public:
-  tl::expected<ExprPtr, Error> parse();
+  std::vector<std::unique_ptr<Stmt>> parse();
   explicit Parser(std::vector<Token> tokens) : m_tokens{std::move(tokens)} {}
 
 private:
@@ -33,6 +33,9 @@ private:
   [[nodiscard]] Token const &previous() const;
   void synchronize();
   // ast
+  std::unique_ptr<Stmt> statement();
+  std::unique_ptr<Stmt> printStatement();
+  std::unique_ptr<Stmt> expressionStatement();
   ExprPtr expression();
   ExprPtr equality();
   ExprPtr comparison();

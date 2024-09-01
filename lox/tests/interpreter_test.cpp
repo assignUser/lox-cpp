@@ -16,7 +16,7 @@ TEST_CASE("Evaluating Generated Expression", "[interpreter]") {
   ValidExpr expr = GENERATE(take(5000, expression()));
   REQUIRE(expr.first != ResultType::UNDEFINED);
   Interpreter lox{};
-  Expr const &result = lox.evaluate(&expr.second.get());
+  Expr const &result = lox.interpret(&expr.second.get());
   INFO(fmt::format("Expected: {}\n Actual:{}\nExpression:{}", expr.first,
                    result.getKind(), Printer{}.print(&expr.second.get())));
 
@@ -44,7 +44,7 @@ TEST_CASE("Unary", "[interpreter]") {
     ExprPtr not_true = bangUnary(true);
     INFO(fmt::format("Expression: {}\n", Printer{}.print(not_true.get())));
 
-    Expr const &result_false = lox.evaluate(not_true.get());
+    Expr const &result_false = lox.interpret(not_true.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result_false).value);
   }
@@ -54,7 +54,7 @@ TEST_CASE("Unary", "[interpreter]") {
     ExprPtr not_false = bangUnary(false);
     INFO(fmt::format("Expression: {}\n", Printer{}.print(not_false.get())));
 
-    Expr const &result_true = lox.evaluate(not_false.get());
+    Expr const &result_true = lox.interpret(not_false.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Boolean>(result_true).value);
   }
@@ -65,7 +65,7 @@ TEST_CASE("Unary", "[interpreter]") {
                                     Grouping::make(bangUnary(false)));
     INFO(fmt::format("Expression: {}\n", Printer{}.print(not_group.get())));
 
-    Expr const &result_false = lox.evaluate(not_group.get());
+    Expr const &result_false = lox.interpret(not_group.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result_false).value);
   }
@@ -76,7 +76,7 @@ TEST_CASE("Unary", "[interpreter]") {
         Unary::make(Token{Token::Type::BANG, "!"}, bangUnary(false));
     INFO(fmt::format("Expression: {}\n", Printer{}.print(not_not_false.get())));
 
-    Expr const &result_true = lox.evaluate(not_not_false.get());
+    Expr const &result_true = lox.interpret(not_not_false.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result_true).value);
   }
@@ -85,7 +85,7 @@ TEST_CASE("Unary", "[interpreter]") {
     lox.clear();
     ExprPtr negative_number = minusUnary(5.5);
 
-    Expr const &result_negative = lox.evaluate(negative_number.get());
+    Expr const &result_negative = lox.interpret(negative_number.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Number>(result_negative).value == -5.5);
   }
@@ -96,7 +96,7 @@ TEST_CASE("Unary", "[interpreter]") {
     ExprPtr positive_number =
         Unary::make(Token{Token::Type::MINUS, "-"}, std::move(negative_number));
 
-    Expr const &result_positive = lox.evaluate(positive_number.get());
+    Expr const &result_positive = lox.interpret(positive_number.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Number>(result_positive).value == 5.5);
   }
@@ -106,7 +106,7 @@ TEST_CASE("Unary", "[interpreter]") {
     // so manually construct a broken Unary
     lox.clear();
     ExprPtr expr{Unary::make(Token{Token::Type::STAR, "*"}, Number::make(5))};
-    Expr const &result = lox.evaluate(expr.get());
+    Expr const &result = lox.interpret(expr.get());
     REQUIRE(lox.hasError());
   }
 }
@@ -128,7 +128,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr gt_true =
         Binary::make(num_big(), Token{Token::Type::GREATER}, num_small());
-    Expr const &result = lox.evaluate(gt_true.get());
+    Expr const &result = lox.interpret(gt_true.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Boolean>(result).value);
   }
@@ -137,7 +137,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr gt_false =
         Binary::make(num_zero(), Token{Token::Type::GREATER}, num_small());
-    Expr const &result = lox.evaluate(gt_false.get());
+    Expr const &result = lox.interpret(gt_false.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result).value);
   }
@@ -146,7 +146,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr gte_true =
         Binary::make(num_big(), Token{Token::Type::GREATER_EQUAL}, num_big());
-    Expr const &result = lox.evaluate(gte_true.get());
+    Expr const &result = lox.interpret(gte_true.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Boolean>(result).value);
   }
@@ -155,7 +155,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr gte_false = Binary::make(
         num_zero(), Token{Token::Type::GREATER_EQUAL}, num_small());
-    Expr const &result = lox.evaluate(gte_false.get());
+    Expr const &result = lox.interpret(gte_false.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result).value);
   }
@@ -164,7 +164,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr lt_true =
         Binary::make(num_zero(), Token{Token::Type::LESS}, num_small());
-    Expr const &result = lox.evaluate(lt_true.get());
+    Expr const &result = lox.interpret(lt_true.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Boolean>(result).value);
   }
@@ -173,7 +173,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr lt_false =
         Binary::make(num_big(), Token{Token::Type::LESS}, num_small());
-    Expr const &result = lox.evaluate(lt_false.get());
+    Expr const &result = lox.interpret(lt_false.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result).value);
   }
@@ -182,7 +182,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr lte_true =
         Binary::make(num_big(), Token{Token::Type::LESS_EQUAL}, num_big());
-    Expr const &result = lox.evaluate(lte_true.get());
+    Expr const &result = lox.interpret(lte_true.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Boolean>(result).value);
   }
@@ -191,7 +191,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr lte_false =
         Binary::make(num_big(), Token{Token::Type::LESS_EQUAL}, num_small());
-    Expr const &result = lox.evaluate(lte_false.get());
+    Expr const &result = lox.interpret(lte_false.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result).value);
   }
@@ -200,7 +200,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr expr =
         Binary::make(num_small(), Token{Token::Type::MINUS}, num_small());
-    Expr const &result = lox.evaluate(expr.get());
+    Expr const &result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Number>(result).value == 0.0);
   }
@@ -209,7 +209,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr expr = Binary::make(Number::make(3.5), Token{Token::Type::PLUS},
                                 Number::make(1.5));
-    Expr const &result = lox.evaluate(expr.get());
+    Expr const &result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Number>(result).value == 5);
   }
@@ -218,7 +218,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr expr = Binary::make(Number::make(6.6), Token{Token::Type::SLASH},
                                 Number::make(2));
-    Expr const &result = lox.evaluate(expr.get());
+    Expr const &result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Number>(result).value == 3.3);
   }
@@ -227,7 +227,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr expr = Binary::make(Number::make(6.6), Token{Token::Type::STAR},
                                 Number::make(2));
-    Expr const &result = lox.evaluate(expr.get());
+    Expr const &result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Number>(result).value == 13.2);
   }
@@ -236,7 +236,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr expr = Binary::make(
         Number::make(2), Token{Token::Type::EQUAL_EQUAL}, Number::make(2));
-    Expr const &result = lox.evaluate(expr.get());
+    Expr const &result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Boolean>(result).value);
   }
@@ -245,7 +245,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr expr = Binary::make(
         Number::make(6), Token{Token::Type::EQUAL_EQUAL}, Number::make(2));
-    Expr const &result = lox.evaluate(expr.get());
+    Expr const &result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result).value);
   }
@@ -254,7 +254,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr expr = Binary::make(Number::make(4), Token{Token::Type::BANG_EQUAL},
                                 Number::make(2));
-    Expr const &result = lox.evaluate(expr.get());
+    Expr const &result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE(expr_as<Boolean>(result).value);
   }
@@ -263,7 +263,7 @@ TEST_CASE("Binary", "[interpreter]") {
     lox.clear();
     ExprPtr expr = Binary::make(Number::make(2), Token{Token::Type::BANG_EQUAL},
                                 Number::make(2));
-    Expr const &result = lox.evaluate(expr.get());
+    Expr const &result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result).value);
   }
@@ -275,7 +275,7 @@ TEST_CASE("Binary", "[interpreter]") {
     ExprPtr expr =
         Binary::make(Number::make(6), Token{Token::Type::EQUAL_EQUAL},
                      String::make("a string"));
-    Expr const &result = lox.evaluate(expr.get());
+    Expr const &result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
     REQUIRE_FALSE(expr_as<Boolean>(result).value);
   }
@@ -286,7 +286,7 @@ TEST_CASE("Binary Grouping", "[interpreter]") {
                             Token{Token::Type::STAR, "*"},
                             Grouping::make(Number::make(5)))};
   Interpreter lox{};
-  Expr const &result = lox.evaluate(expr.get());
+  Expr const &result = lox.interpret(expr.get());
   REQUIRE(not lox.hasError());
   REQUIRE(isA<Number>(result));
   REQUIRE(expr_as<Number>(result).value == 25);

@@ -2,6 +2,7 @@
 //
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include <fstream>
+#include <memory>
 #include <numeric>
 #include <string_view>
 #include <utility>
@@ -87,16 +88,15 @@ tl::expected<int, Error> run(std::string_view source) {
     }
     return tl::unexpected(Error{0, "", "Error while scanning."});
   }
-  auto parser = Parser{tokens};
-  tl::expected<ExprPtr, Error> expression = parser.parse();
 
-  if (not expression) {
-    return tl::unexpected(expression.error());
-  } else {
-    Printer{}.print(expression->get());
-    static Interpreter interpreter{}; 
-    interpreter.evaluate(expression.value().get());
-    // TODO pass on error via expected.
+  auto parser = Parser{tokens};
+  std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
+
+  static Interpreter interpreter{};
+  interpreter.interpret(statements);
+  if (interpreter.hasError()) {
+  // TODO add error mgmt back in
+    return tl::unexpected(Error(0, "foo", "bar"));
   }
 
   return 0;
@@ -108,7 +108,6 @@ tl::expected<int, Error> runFile(std::vector<std::string> const &filenames) {
   for (auto const &filename : filenames) {
     std::ifstream file(filename);
     if (file.is_open()) {
-      fmt::print("Parsing {} ...\n", filename);
       std::string source((std::istreambuf_iterator<char>(file)),
                          std::istreambuf_iterator<char>());
 

@@ -6,7 +6,7 @@
 
 class Interpreter : public Visitor {
 public:
-  Expr const &evaluate(Expr const *expr);
+  ExprPtr interpret(std::vector<std::unique_ptr<Stmt>> const &statements);
   bool hasError() { return m_hasError; }
   void clear() {
     m_result.reset();
@@ -25,7 +25,8 @@ public:
   void visit(Print const &expr) override;
 
 private:
-  void eval(Expr const *expr);
+  void evaluate(Expr const *expr);
+  void execute(Stmt const *stmt);
   ExprPtr m_result;
   ExprPtr m_tmp;
   bool m_hasError{false};

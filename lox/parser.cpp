@@ -3,7 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include "lox/parser.hpp"
 
+#include "lox/ast.hpp"
 #include "lox/error.hpp"
+#include <vector>
 
 Token const &Parser::advance() {
   if (not atEnd()) {
@@ -28,7 +30,7 @@ Token const &Parser::consume(Token::Type type, std::string const &message) {
   throw error(peek(), message);
 }
 
-Error Parser::error(Token const& token, std::string const &message) {
+Error Parser::error(Token const &token, std::string const &message) {
   Error error = token.type == Token::Type::END_OF_FILE
                     ? Error{token.line, "at end", message}
                     : Error{token.line, "at '" + token.lexem + "'", message};
@@ -65,15 +67,39 @@ void Parser::synchronize() {
   }
 }
 
-tl::expected<ExprPtr, Error> Parser::parse() {
+std::vector<std::unique_ptr<Stmt>> Parser::parse() {
+  std::vector<std::unique_ptr<Stmt>> statements{};
   try {
-    return expression();
-  } catch (Error e) {
-    return tl::unexpected(e);
+  while (not atEnd()) {
+    statements.push_back(statement());
   }
+  } catch (Error e) {
+  }
+  return statements;
 }
 
 // ast
+
+std::unique_ptr<Stmt> Parser::statement() {
+  if (match(Token::Type::PRINT)) {
+    return printStatement();
+  } else {
+    return expressionStatement();
+  }
+}
+
+std::unique_ptr<Stmt> Parser::printStatement() {
+  ExprPtr value = expression();
+  consume(Token::Type::SEMICOLON, "Expect ';' after value.");
+  return Print::make(std::move(value));
+}
+
+std::unique_ptr<Stmt> Parser::expressionStatement() {
+  ExprPtr expr = expression();
+  consume(Token::Type::SEMICOLON, "Expect ';' after Expression.");
+  return Expression::make(std::move(expr));
+}
+
 ExprPtr Parser::expression() { return equality(); }
 // equality → comparison (("!=" | "==") comparison)* ;
 ExprPtr Parser::equality() {
@@ -157,5 +183,3 @@ ExprPtr Parser::primary() {
     throw error(peek(), "Expect expression.");
   }
 }
-
-
