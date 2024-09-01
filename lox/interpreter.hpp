@@ -6,7 +6,7 @@
 
 class Interpreter : public Visitor {
 public:
-  ExprPtr interpret(std::vector<std::unique_ptr<Stmt>> const &statements);
+  ExprPtr interpret(std::vector<StmtPtr> const &statements);
   bool hasError() { return m_hasError; }
   void clear() {
     m_result.reset();

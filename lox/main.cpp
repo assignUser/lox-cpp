@@ -90,7 +90,7 @@ tl::expected<int, Error> run(std::string_view source) {
   }
 
   auto parser = Parser{tokens};
-  std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
+  std::vector<StmtPtr> statements = parser.parse();
 
   static Interpreter interpreter{};
   interpreter.interpret(statements);

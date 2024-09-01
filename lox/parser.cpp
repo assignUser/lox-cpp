@@ -67,8 +67,8 @@ void Parser::synchronize() {
   }
 }
 
-std::vector<std::unique_ptr<Stmt>> Parser::parse() {
-  std::vector<std::unique_ptr<Stmt>> statements{};
+std::vector<StmtPtr> Parser::parse() {
+  std::vector<StmtPtr> statements{};
   try {
   while (not atEnd()) {
     statements.push_back(statement());
@@ -80,7 +80,7 @@ std::vector<std::unique_ptr<Stmt>> Parser::parse() {
 
 // ast
 
-std::unique_ptr<Stmt> Parser::statement() {
+StmtPtr Parser::statement() {
   if (match(Token::Type::PRINT)) {
     return printStatement();
   } else {
@@ -88,13 +88,13 @@ std::unique_ptr<Stmt> Parser::statement() {
   }
 }
 
-std::unique_ptr<Stmt> Parser::printStatement() {
+StmtPtr Parser::printStatement() {
   ExprPtr value = expression();
   consume(Token::Type::SEMICOLON, "Expect ';' after value.");
   return Print::make(std::move(value));
 }
 
-std::unique_ptr<Stmt> Parser::expressionStatement() {
+StmtPtr Parser::expressionStatement() {
   ExprPtr expr = expression();
   consume(Token::Type::SEMICOLON, "Expect ';' after Expression.");
   return Expression::make(std::move(expr));

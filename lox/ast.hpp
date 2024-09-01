@@ -310,7 +310,7 @@ struct fmt::formatter<Stmt::StmtKind> : fmt::formatter<std::string_view> {
 
 class Expression : public Stmt {
 public:
-  [[nodiscard]] static std::unique_ptr<Stmt> make(std::unique_ptr<Expr> expr) {
+  [[nodiscard]] static StmtPtr make(std::unique_ptr<Expr> expr) {
     return std::unique_ptr<Stmt>(new Expression{std::move(expr)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
@@ -333,7 +333,7 @@ private:
 
 class Print : public Stmt {
 public:
-  [[nodiscard]] static std::unique_ptr<Stmt> make(std::unique_ptr<Expr> expr) {
+  [[nodiscard]] static StmtPtr make(std::unique_ptr<Expr> expr) {
     return std::unique_ptr<Stmt>(new Print{std::move(expr)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }

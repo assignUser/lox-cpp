@@ -13,7 +13,7 @@ void Interpreter::evaluate(Expr const *expr) { expr->accept(*this); }
 void Interpreter::execute(Stmt const *stmt) { stmt->accept(*this); }
 
 ExprPtr
-Interpreter::interpret(std::vector<std::unique_ptr<Stmt>> const &statements) {
+Interpreter::interpret(std::vector<StmtPtr> const &statements) {
   try {
     for (auto const &stmt : statements) {
       execute(stmt.get());
