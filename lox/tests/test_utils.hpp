@@ -453,6 +453,8 @@ public:
   void visit(Nil const &expr) override { m_str.append("NIL"); }
   void visit(Expression const &expr) override { ; }
   void visit(Print const &expr) override { ; }
+  void visit(Var const &expr) override { ; }
+  void visit(Variable const &expr) override { ; }
 
 private:
   std::string m_str{""};

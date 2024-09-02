@@ -4,24 +4,27 @@
 
 #pragma once
 #include <memory>
+#include <utility>
 
 #include <fmt/format.h>
 
 #include "lox/token.hpp"
 
 class Binary;
-class Grouping;
-class String;
-class Number;
 class Boolean;
-class Nil;
-class Unary;
 class Expr;
+class Grouping;
+class Nil;
+class Number;
+class String;
+class Unary;
+class Variable;
 using ExprPtr = std::unique_ptr<Expr>;
 
 class Stmt;
 class Expression;
 class Print;
+class Var;
 using StmtPtr = std::unique_ptr<Stmt>;
 
 class Visitor {
@@ -35,8 +38,11 @@ public:
   virtual void visit(Boolean const &expr) = 0;
   virtual void visit(Nil const &expr) = 0;
   virtual void visit(Unary const &expr) = 0;
+  virtual void visit(Variable const &expr) = 0;
+  // Statements
   virtual void visit(Expression const &stmt) = 0;
   virtual void visit(Print const &stmt) = 0;
+  virtual void visit(Var const &stmt) = 0;
 
 protected:
   Visitor() = default;
@@ -48,13 +54,23 @@ protected:
 
 class Expr {
 public:
-  enum class ExprKind { Binary, Boolean, Grouping, Nil, Number, String, Unary };
+  enum class ExprKind {
+    Binary,
+    Boolean,
+    Grouping,
+    Nil,
+    Number,
+    String,
+    Unary,
+    Variable
+  };
 
   explicit Expr(ExprKind kind) : m_kind(kind) {}
 
   virtual ~Expr() = default;
   virtual void accept(Visitor &visitor) const = 0;
 
+  [[nodiscard]] auto clone() const { return ExprPtr(cloneImpl()); }
   [[nodiscard]] virtual bool equals(Expr const &other) const = 0;
   [[nodiscard]] ExprKind getKind() const { return m_kind; }
   [[nodiscard]] virtual bool truthy() const { return true; }
@@ -64,6 +80,8 @@ protected:
   Expr(Expr &&) = default;
   Expr &operator=(const Expr &) = default;
   Expr &operator=(Expr &&) = default;
+
+  [[nodiscard]] virtual Expr *cloneImpl() const = 0;
 
 private:
   ExprKind m_kind;
@@ -87,7 +105,8 @@ struct fmt::formatter<Expr::ExprKind> : fmt::formatter<std::string_view> {
   }
 };
 
-template <typename Derived, typename Base> [[nodiscard]] bool isA(Base const &expr) {
+template <typename Derived, typename Base>
+[[nodiscard]] bool isA(Base const &expr) {
   return Derived::classof(expr);
 }
 
@@ -135,6 +154,10 @@ private:
   Binary(std::unique_ptr<Expr> lhs, Token op, std::unique_ptr<Expr> rhs)
       : Expr(ExprKind::Binary), lhs{std::move(lhs)}, op{std::move(op)},
         rhs{std::move(rhs)} {}
+
+  [[nodiscard]] Expr *cloneImpl() const override {
+    return new Binary(lhs->clone(), op, rhs->clone());
+  }
 };
 
 class Grouping : public Expr {
@@ -158,6 +181,10 @@ public:
 private:
   explicit Grouping(std::unique_ptr<Expr> expr)
       : Expr(ExprKind::Grouping), expr{std::move(expr)} {}
+
+  [[nodiscard]] Expr *cloneImpl() const override {
+    return new Grouping(expr->clone());
+  }
 };
 
 class String : public Expr {
@@ -180,6 +207,8 @@ public:
 private:
   explicit String(std::string value)
       : Expr(ExprKind::String), value{std::move(value)} {}
+
+  [[nodiscard]] Expr *cloneImpl() const override { return new String(value); }
 };
 
 class Number : public Expr {
@@ -201,6 +230,7 @@ public:
 
 private:
   explicit Number(double value) : Expr(ExprKind::Number), value{value} {}
+  [[nodiscard]] Expr *cloneImpl() const override { return new Number(value); }
 };
 
 class Boolean : public Expr {
@@ -224,6 +254,7 @@ public:
 
 private:
   explicit Boolean(bool value) : Expr(ExprKind::Boolean), value{value} {}
+  [[nodiscard]] Expr *cloneImpl() const override { return new Boolean(value); }
 };
 
 class Nil : public Expr {
@@ -246,6 +277,7 @@ public:
 
 private:
   explicit Nil() : Expr(ExprKind::Nil){};
+  [[nodiscard]] Expr *cloneImpl() const override { return new Nil(); }
 };
 
 class Unary : public Expr {
@@ -271,11 +303,43 @@ public:
 private:
   Unary(Token op, std::unique_ptr<Expr> expr)
       : Expr(ExprKind::Unary), op{std::move(op)}, expr{std::move(expr)} {}
+
+  [[nodiscard]] Expr *cloneImpl() const override {
+    return new Unary(op, expr->clone());
+  }
+};
+
+class Variable : public Expr {
+public:
+  [[nodiscard]] static std::unique_ptr<Expr> make(Token name) {
+    if (name.type != Token::Type::IDENTIFIER) {
+      throw "Tried to create Variable with non IDENTIFIER token.";
+    }
+
+    return std::unique_ptr<Expr>(new Variable{std::move(name)});
+  }
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    if (not isA<Variable>(other)) {
+      return false;
+    }
+    return name.lexem == expr_as<Variable>(other).name.lexem;
+  }
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Variable;
+  }
+
+  Token name;
+
+private:
+  explicit Variable(Token name)
+      : Expr(ExprKind::Unary), name{std::move(name)} {}
+  [[nodiscard]] Expr *cloneImpl() const override { return new Variable(name); }
 };
 
 class Stmt {
 public:
-  enum class StmtKind { Expression, Print };
+  enum class StmtKind { Expression, Print, Var };
 
   Stmt(const Stmt &) = default;
   Stmt(Stmt &&) = delete;
@@ -348,4 +412,31 @@ public:
 private:
   explicit Print(ExprPtr expr)
       : Stmt(Stmt::StmtKind::Print), expr{std::move(expr)} {}
+};
+
+class Var : public Stmt {
+public:
+  [[nodiscard]] static StmtPtr make(Token name,
+                                    std::unique_ptr<Expr> initializer) {
+    return std::unique_ptr<Stmt>(
+        new Var{std::move(name), std::move(initializer)});
+  }
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  static bool classof(const Stmt &stmt) {
+    return stmt.getKind() == Stmt::StmtKind::Var;
+  }
+  [[nodiscard]] bool equals(Stmt const &other) const override {
+    if (not isA<Var>(other)) {
+      return false;
+    }
+    return initializer->equals(*stmt_as<Var>(other).initializer);
+  }
+
+  Token name;
+  ExprPtr initializer;
+
+private:
+  explicit Var(Token name, ExprPtr expr)
+      : Stmt(Stmt::StmtKind::Var), name{std::move(name)},
+        initializer{std::move(expr)} {}
 };

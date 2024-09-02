@@ -4,11 +4,34 @@
 
 #include "lox/ast.hpp"
 #include "lox/error.hpp"
+#include <stdexcept>
+
+class Environment {
+public:
+  void define(const std::string &name, ExprPtr value) {
+    m_values.insert_or_assign(name, std::move(value));
+  }
+
+  Expr const &get(const Token &name) {
+    if (name.type != Token::Type::IDENTIFIER) {
+      throw "Token not an identifier";
+    }
+
+    try {
+      return *m_values.at(name.lexem).get();
+    } catch (std::out_of_range e) {
+      throw Error(0, "", fmt::format("Undefined variable {}.", name.lexem));
+    }
+  }
+
+private:
+  std::map<std::string, ExprPtr> m_values{};
+};
 
 class Interpreter : public Visitor {
 public:
   ExprPtr interpret(std::vector<StmtPtr> const &statements);
-  ExprPtr interpret(Expr const* expr);
+  ExprPtr interpret(Expr const *expr);
   bool hasError() { return m_hasError; }
   void clear() {
     m_result.reset();
@@ -23,8 +46,10 @@ public:
   void visit(Number const &expr) override;
   void visit(String const &expr) override;
   void visit(Unary const &expr) override;
+  void visit(Variable const &expr) override;
   void visit(Expression const &expr) override;
   void visit(Print const &expr) override;
+  void visit(Var const &expr) override;
 
 private:
   void evaluate(Expr const *expr);
@@ -32,4 +57,5 @@ private:
   ExprPtr m_result;
   ExprPtr m_tmp;
   bool m_hasError{false};
+  Environment m_env{};
 };

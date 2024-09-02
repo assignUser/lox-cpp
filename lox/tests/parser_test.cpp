@@ -77,6 +77,8 @@ public:
   void visit(Nil const &expr) override { incrementCount("Nil"); }
   void visit(Expression const &expr) override { incrementCount("Expression"); }
   void visit(Print const &expr) override { incrementCount("Print"); }
+  void visit(Var const &expr) override { incrementCount("Var"); }
+  void visit(Variable const &expr) override { incrementCount("Var"); }
 };
 
 class Printer : public Visitor {
@@ -88,6 +90,19 @@ public:
   Printer &operator=(const Printer &) = default;
   Printer &operator=(Printer &&) = delete;
   ~Printer() override = default;
+
+  std::string format(Expr const *expr) {
+    expr->accept(*this);
+    return m_str;
+  }
+
+  std::string format(std::vector<StmtPtr> const &stmts) {
+    for (auto const &stmt : stmts) {
+      stmt->accept(*this);
+      m_str += "\n";
+    }
+    return m_str;
+  }
 
   void print(Expr const *expr) {
     expr->accept(*this);
@@ -134,6 +149,8 @@ public:
   void visit(Nil const &expr) override { m_str.append("NIL"sv); }
   void visit(Expression const &expr) override { ; }
   void visit(Print const &expr) override { ; }
+  void visit(Var const &expr) override { ; }
+  void visit(Variable const &expr) override { ; }
 
 private:
   std::string m_str{""};
@@ -485,7 +502,8 @@ TEST_CASE("Parse generated expressions", "[Parser]") {
   fmt::println("Parsed Expression:");
   Printer{}.print(result.value());
 
-  REQUIRE(expected_ast.equals(*stmt_as<Expression>(*result.value().front()).expr.get()));
+  REQUIRE(expected_ast.equals(
+      *stmt_as<Expression>(*result.value().front()).expr.get()));
 }
 
 TEST_CASE("Parser handles syntax errors", "[Parser]") {
@@ -496,7 +514,7 @@ TEST_CASE("Parser handles syntax errors", "[Parser]") {
   Parser parser(tokens);
 
   auto result = parser.parse();
-  REQUIRE_FALSE(result.has_value());
+  REQUIRE(parser.hasError());
   // REQUIRE(result.error().code() == Error::Type::SyntaxError);
 }
 

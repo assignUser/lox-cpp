@@ -12,8 +12,7 @@
 void Interpreter::evaluate(Expr const *expr) { expr->accept(*this); }
 void Interpreter::execute(Stmt const *stmt) { stmt->accept(*this); }
 
-ExprPtr
-Interpreter::interpret(std::vector<StmtPtr> const &statements) {
+ExprPtr Interpreter::interpret(std::vector<StmtPtr> const &statements) {
   try {
     for (auto const &stmt : statements) {
       execute(stmt.get());
@@ -29,8 +28,8 @@ Interpreter::interpret(std::vector<StmtPtr> const &statements) {
   return res;
 }
 
-ExprPtr Interpreter::interpret(Expr const* expr){
-   try {
+ExprPtr Interpreter::interpret(Expr const *expr) {
+  try {
     evaluate(expr);
   } catch (Error e) {
     m_hasError = true;
@@ -40,7 +39,7 @@ ExprPtr Interpreter::interpret(Expr const* expr){
 
   ExprPtr res = std::move(m_result);
   m_result.reset();
-  return res; 
+  return res;
 }
 
 void Interpreter::visit(Binary const &expr) {
@@ -168,6 +167,7 @@ void Interpreter::visit(Unary const &expr) {
 }
 
 void Interpreter::visit(Expression const &stmt) { evaluate(stmt.expr.get()); }
+
 void Interpreter::visit(Print const &stmt) {
   evaluate(stmt.expr.get());
   if (isA<String>(*m_result)) {
@@ -182,4 +182,18 @@ void Interpreter::visit(Print const &stmt) {
     throw Error{0, "",
                 fmt::format("Unexpected result type {}.", m_result->getKind())};
   }
+}
+
+void Interpreter::visit(Var const &var) {
+  ExprPtr value = Nil::make();
+  if (var.initializer->getKind() != Expr::ExprKind::Nil) {
+    evaluate(var.initializer.get());
+    value = std::move(m_result);
+  }
+
+  m_env.define(var.name.lexem, std::move(value));
+}
+
+void Interpreter::visit(Variable const &var) {
+  m_result = m_env.get(var.name).clone();
 }

@@ -74,6 +74,8 @@ public:
   void visit(Nil const &expr) override { m_str.append(" NIL "sv); }
   void visit(Expression const &expr) override { ; }
   void visit(Print const &expr) override { ; }
+  void visit(Var const &expr) override { ; }
+  void visit(Variable const &expr) override { ; }
 
 private:
   std::string m_str{""};
@@ -93,6 +95,11 @@ tl::expected<int, Error> run(std::string_view source) {
   tl::expected<std::vector<StmtPtr>, Error> statements = parser.parse();
   if (not statements) {
     return tl::unexpected(statements.error());
+  }
+
+  if (parser.hasError()){
+    // Don't run interpreter on input with parser error.
+    return 1;
   }
 
   static Interpreter interpreter{};

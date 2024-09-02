@@ -12,7 +12,7 @@
 #include "lox/interpreter.hpp"
 #include "lox/tests/test_utils.hpp"
 
-std::vector<StmtPtr> toStmt(ExprPtr expr){
+std::vector<StmtPtr> toStmt(ExprPtr expr) {
   std::vector<StmtPtr> stmt;
   stmt.push_back(Expression::make(std::move(expr)));
   return stmt;

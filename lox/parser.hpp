@@ -17,6 +17,7 @@
 
 class Parser {
 public:
+  bool hasError(){ return m_hasError; }
   tl::expected<std::vector<StmtPtr>, Error> parse();
   explicit Parser(std::vector<Token> tokens) : m_tokens{std::move(tokens)} {}
 
@@ -33,6 +34,8 @@ private:
   [[nodiscard]] Token const &previous() const;
   void synchronize();
   // ast
+  StmtPtr varDeclaration();
+  StmtPtr declaration();
   StmtPtr statement();
   StmtPtr printStatement();
   StmtPtr expressionStatement();
@@ -46,4 +49,5 @@ private:
 
   std::vector<Token> m_tokens{};
   size_t m_current{0};
+  bool m_hasError{false};
 };

@@ -71,15 +71,42 @@ tl::expected<std::vector<StmtPtr>, Error> Parser::parse() {
   std::vector<StmtPtr> statements{};
   try {
     while (not atEnd()) {
-      statements.push_back(statement());
+      statements.push_back(declaration());
     }
   } catch (Error e) {
+    m_hasError = true;
     return tl::unexpected(e);
   }
   return statements;
 }
 
 // ast
+StmtPtr Parser::declaration() {
+  try {
+    if (match(Token::Type::VAR)) {
+      return varDeclaration();
+    }
+
+    return statement();
+    // This should be a specialized parse error
+  } catch (Error e) {
+    m_hasError = true;
+    synchronize();
+    return Expression::make(Nil::make());
+  }
+}
+
+StmtPtr Parser::varDeclaration() {
+  Token name = consume(Token::Type::IDENTIFIER, "Expect variable name.");
+
+  ExprPtr initializer = Nil::make();
+  if (match(Token::Type::EQUAL)) {
+    initializer = expression();
+  }
+
+  consume(Token::Type::SEMICOLON, "Expect ';' after variable declaration.");
+  return Var::make(name, std::move(initializer));
+}
 
 StmtPtr Parser::statement() {
   if (match(Token::Type::PRINT)) {
@@ -175,6 +202,8 @@ ExprPtr Parser::primary() {
     return String::make(std::get<std::string>(previous().literal));
   } else if (match(Token::Type::NUMBER)) {
     return Number::make(std::get<double>(previous().literal));
+  } else if (match(Token::Type::IDENTIFIER)) {
+    return Variable::make(previous());
   } else if (match(Token::Type::LEFT_PAREN)) {
     ExprPtr expr = expression();
     // consume should use unexpected?
