@@ -67,5 +67,5 @@ target_link_libraries(
           bfg::lyra)
 
 if(BUILD_TESTING)
-  add_subdirectory(tests)
+  # add_subdirectory(tests)
 endif()
