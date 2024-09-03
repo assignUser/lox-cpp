@@ -7,6 +7,7 @@
 #include <utility>
 
 #include <fmt/format.h>
+#include <vector>
 
 #include "lox/token.hpp"
 
@@ -26,6 +27,7 @@ class Stmt;
 class Expression;
 class Print;
 class Var;
+class Block;
 using StmtPtr = std::unique_ptr<Stmt>;
 
 class Visitor {
@@ -45,6 +47,7 @@ public:
   virtual void visit(Expression const &stmt) = 0;
   virtual void visit(Print const &stmt) = 0;
   virtual void visit(Var const &stmt) = 0;
+  virtual void visit(Block const &stmt) = 0;
 
 protected:
   Visitor() = default;
@@ -99,6 +102,8 @@ const static std::map<Expr::ExprKind, std::string_view> expr_kind_literals{
     {Expr::ExprKind::Number, "Number"},
     {Expr::ExprKind::String, "String"},
     {Expr::ExprKind::Unary, "Unary"},
+    {Expr::ExprKind::Variable, "Variable"},
+    {Expr::ExprKind::Assign, "Assign"},
 };
 
 template <>
@@ -354,7 +359,8 @@ public:
     if (not isA<Assign>(other)) {
       return false;
     }
-    return name.lexem == expr_as<Assign>(other).name.lexem and value->equals(other);
+    return name.lexem == expr_as<Assign>(other).name.lexem and
+           value->equals(other);
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Assign;
@@ -365,13 +371,16 @@ public:
 
 private:
   explicit Assign(Token name, ExprPtr value)
-      : Expr(ExprKind::Assign), name{std::move(name)}, value{std::move(value)} {}
-  [[nodiscard]] Expr *cloneImpl() const override { return new Assign(name, value->clone()); }
+      : Expr(ExprKind::Assign), name{std::move(name)}, value{std::move(value)} {
+  }
+  [[nodiscard]] Expr *cloneImpl() const override {
+    return new Assign(name, value->clone());
+  }
 };
 
 class Stmt {
 public:
-  enum class StmtKind { Expression, Print, Var };
+  enum class StmtKind { Expression, Print, Var, Block };
 
   Stmt(const Stmt &) = default;
   Stmt(Stmt &&) = delete;
@@ -471,4 +480,29 @@ private:
   explicit Var(Token name, ExprPtr expr)
       : Stmt(Stmt::StmtKind::Var), name{std::move(name)},
         initializer{std::move(expr)} {}
+};
+
+class Block : public Stmt {
+public:
+  [[nodiscard]] static StmtPtr
+  make(std::vector<StmtPtr> stmts = std::vector<StmtPtr>{}) {
+    return std::unique_ptr<Stmt>(new Block{std::move(stmts)});
+  }
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  static bool classof(const Stmt &stmt) {
+    return stmt.getKind() == Stmt::StmtKind::Block;
+  }
+  [[nodiscard]] bool equals(Stmt const &other) const override {
+    if (not isA<Block>(other)) {
+      return false;
+    }
+
+    return this == &stmt_as<Block>(other);
+  }
+
+  std::vector<StmtPtr> statements;
+
+private:
+  explicit Block(std::vector<StmtPtr> stmts)
+      : Stmt(Stmt::StmtKind::Block), statements{std::move(stmts)} {}
 };

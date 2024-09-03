@@ -198,7 +198,17 @@ void Interpreter::visit(Variable const &var) {
   m_result = m_env.get(var.name).clone();
 }
 
-void Interpreter::visit(Assign const &expr){
+void Interpreter::visit(Assign const &expr) {
   evaluate(expr.value.get());
   m_env.assign(expr.name, m_result->clone());
-} 
+}
+
+void Interpreter::visit(Block const &stmt) { executeBlock(stmt.statements); }
+
+void Interpreter::executeBlock(std::vector<StmtPtr> const &statements) {
+  Context ctx{this};
+
+  for (auto const &stmt : statements) {
+    ctx.execute(stmt.get());
+  }
+}

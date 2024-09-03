@@ -6,9 +6,12 @@
 #include "lox/error.hpp"
 #include <stdexcept>
 #include <tl/optional.hpp>
+#include <vector>
 
 class Environment {
 public:
+  explicit Environment(Environment *encl = nullptr) : enclosing{encl} {}
+
   void define(const std::string &name, ExprPtr value) {
     m_values.insert_or_assign(name, std::move(value));
   }
@@ -23,7 +26,7 @@ public:
     }
 
     if (enclosing) {
-      return enclosing.value()->get(name);
+      return enclosing->get(name);
     }
 
     throw Error(0, "", fmt::format("Undefined variable {}.", name.lexem));
@@ -34,14 +37,14 @@ public:
       m_values.insert_or_assign(name.lexem, std::move(value));
       return;
     } else if (enclosing) {
-      enclosing.value()->assign(name, std::move(value));
+      enclosing->assign(name, std::move(value));
       return;
     }
 
     throw Error(0, "", fmt::format("Undefined variable {}.", name.lexem));
   }
 
-  tl::optional<Environment *> enclosing;
+  Environment *enclosing;
 
 private:
   std::map<std::string, ExprPtr> m_values{};
@@ -49,6 +52,27 @@ private:
 
 class Interpreter : public Visitor {
 public:
+  class Context {
+    // RAII alternative to Javas try{}finally to ensure the previous environment
+    // is correctly restored on error.
+  public:
+    explicit Context(Interpreter *interp)
+        : m_interp{interp}, m_previous(std::move(interp->m_env)) {
+      m_interp->m_env = Environment(&m_previous);
+    }
+    Context(const Context &) = default;
+    Context(Context &&) = default;
+    Context &operator=(const Context &) = default;
+    Context &operator=(Context &&) = default;
+    ~Context() { std::swap(m_interp->m_env, m_previous); }
+
+    void execute(Stmt const *stmt) { m_interp->execute(stmt); }
+
+  private:
+    Interpreter *m_interp;
+    Environment m_previous;
+  };
+
   ExprPtr interpret(std::vector<StmtPtr> const &statements);
   ExprPtr interpret(Expr const *expr);
   bool hasError() { return m_hasError; }
@@ -68,13 +92,15 @@ public:
   void visit(Variable const &expr) override;
   void visit(Assign const &expr) override;
   // statements
-  void visit(Expression const &expr) override;
-  void visit(Print const &expr) override;
-  void visit(Var const &expr) override;
+  void visit(Expression const &stmt) override;
+  void visit(Print const &stmt) override;
+  void visit(Var const &stmt) override;
+  void visit(Block const &stmt) override;
 
 private:
   void evaluate(Expr const *expr);
   void execute(Stmt const *stmt);
+  void executeBlock(std::vector<StmtPtr> const &statements);
   ExprPtr m_result;
   ExprPtr m_tmp;
   bool m_hasError{false};

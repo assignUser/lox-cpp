@@ -111,6 +111,8 @@ StmtPtr Parser::varDeclaration() {
 StmtPtr Parser::statement() {
   if (match(Token::Type::PRINT)) {
     return printStatement();
+  } else if (match(Token::Type::LEFT_BRACE)) {
+    return Block::make(block());
   } else {
     return expressionStatement();
   }
@@ -126,6 +128,18 @@ StmtPtr Parser::expressionStatement() {
   ExprPtr expr = expression();
   consume(Token::Type::SEMICOLON, "Expect ';' after Expression.");
   return Expression::make(std::move(expr));
+}
+
+//"{" declaration* "}" ;
+std::vector<StmtPtr> Parser::block() {
+  std::vector<StmtPtr> stmts{};
+
+  while (not check(Token::Type::RIGHT_BRACE) && not atEnd()) {
+    stmts.push_back(declaration());
+  }
+
+  consume(Token::Type::RIGHT_BRACE, "Expect '}' after block.");
+  return stmts;
 }
 
 ExprPtr Parser::expression() { return assignment(); }
