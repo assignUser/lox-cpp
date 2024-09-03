@@ -24,6 +24,15 @@ public:
     }
   }
 
+  void assign(const Token &name, ExprPtr value) {
+    if (m_values.contains(name.lexem)) {
+      m_values.insert_or_assign(name.lexem, std::move(value));
+      return;
+    }
+
+    throw Error(0, "", fmt::format("Undefined variable {}.", name.lexem));
+  }
+
 private:
   std::map<std::string, ExprPtr> m_values{};
 };
@@ -47,6 +56,8 @@ public:
   void visit(String const &expr) override;
   void visit(Unary const &expr) override;
   void visit(Variable const &expr) override;
+  void visit(Assign const &expr) override;
+  // statements
   void visit(Expression const &expr) override;
   void visit(Print const &expr) override;
   void visit(Var const &expr) override;

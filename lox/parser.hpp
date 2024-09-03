@@ -17,7 +17,7 @@
 
 class Parser {
 public:
-  bool hasError(){ return m_hasError; }
+  bool hasError() { return m_hasError; }
   tl::expected<std::vector<StmtPtr>, Error> parse();
   explicit Parser(std::vector<Token> tokens) : m_tokens{std::move(tokens)} {}
 
@@ -40,6 +40,7 @@ private:
   StmtPtr printStatement();
   StmtPtr expressionStatement();
   ExprPtr expression();
+  ExprPtr assignment();
   ExprPtr equality();
   ExprPtr comparison();
   ExprPtr term();

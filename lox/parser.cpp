@@ -128,7 +128,28 @@ StmtPtr Parser::expressionStatement() {
   return Expression::make(std::move(expr));
 }
 
-ExprPtr Parser::expression() { return equality(); }
+ExprPtr Parser::expression() { return assignment(); }
+
+// assignment     → IDENTIFIER "=" assignment | equality;
+ExprPtr Parser::assignment() {
+  ExprPtr expr = equality();
+
+  if (match(Token::Type::EQUAL)) {
+    Token equals = previous();
+    ExprPtr value = assignment();
+
+    if (isA<Variable>(*expr.get())) {
+      Token name = expr_as<Variable>(*expr.get()).name;
+      return Assign::make(name, std::move(value));
+    }
+    m_hasError = true;
+    // casting to void explicitly disables the `[[nodiscard]]` warning
+    (void)error(equals, "Invalid assignment target");
+  }
+
+  return expr;
+}
+
 // equality → comparison (("!=" | "==") comparison)* ;
 ExprPtr Parser::equality() {
   ExprPtr expr = comparison();

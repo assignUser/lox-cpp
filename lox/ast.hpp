@@ -19,6 +19,7 @@ class Number;
 class String;
 class Unary;
 class Variable;
+class Assign;
 using ExprPtr = std::unique_ptr<Expr>;
 
 class Stmt;
@@ -39,6 +40,7 @@ public:
   virtual void visit(Nil const &expr) = 0;
   virtual void visit(Unary const &expr) = 0;
   virtual void visit(Variable const &expr) = 0;
+  virtual void visit(Assign const &expr) = 0;
   // Statements
   virtual void visit(Expression const &stmt) = 0;
   virtual void visit(Print const &stmt) = 0;
@@ -62,7 +64,8 @@ public:
     Number,
     String,
     Unary,
-    Variable
+    Variable,
+    Assign
   };
 
   explicit Expr(ExprKind kind) : m_kind(kind) {}
@@ -333,8 +336,37 @@ public:
 
 private:
   explicit Variable(Token name)
-      : Expr(ExprKind::Unary), name{std::move(name)} {}
+      : Expr(ExprKind::Variable), name{std::move(name)} {}
   [[nodiscard]] Expr *cloneImpl() const override { return new Variable(name); }
+};
+
+class Assign : public Expr {
+public:
+  [[nodiscard]] static std::unique_ptr<Expr> make(Token name, ExprPtr value) {
+    if (name.type != Token::Type::IDENTIFIER) {
+      throw "Tried to create Assign with non IDENTIFIER token.";
+    }
+
+    return std::unique_ptr<Expr>(new Assign{std::move(name), std::move(value)});
+  }
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    if (not isA<Assign>(other)) {
+      return false;
+    }
+    return name.lexem == expr_as<Assign>(other).name.lexem and value->equals(other);
+  }
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Assign;
+  }
+
+  Token name;
+  ExprPtr value;
+
+private:
+  explicit Assign(Token name, ExprPtr value)
+      : Expr(ExprKind::Assign), name{std::move(name)}, value{std::move(value)} {}
+  [[nodiscard]] Expr *cloneImpl() const override { return new Assign(name, value->clone()); }
 };
 
 class Stmt {

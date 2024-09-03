@@ -188,7 +188,7 @@ void Interpreter::visit(Var const &var) {
   ExprPtr value = Nil::make();
   if (var.initializer->getKind() != Expr::ExprKind::Nil) {
     evaluate(var.initializer.get());
-    value = std::move(m_result);
+    value = m_result->clone();
   }
 
   m_env.define(var.name.lexem, std::move(value));
@@ -197,3 +197,8 @@ void Interpreter::visit(Var const &var) {
 void Interpreter::visit(Variable const &var) {
   m_result = m_env.get(var.name).clone();
 }
+
+void Interpreter::visit(Assign const &expr){
+  evaluate(expr.value.get());
+  m_env.assign(expr.name, m_result->clone());
+} 
