@@ -5,6 +5,7 @@
 #include "lox/ast.hpp"
 #include "lox/error.hpp"
 #include <stdexcept>
+#include <tl/optional.hpp>
 
 class Environment {
 public:
@@ -17,21 +18,30 @@ public:
       throw "Token not an identifier";
     }
 
-    try {
+    if (m_values.contains(name.lexem)) {
       return *m_values.at(name.lexem).get();
-    } catch (std::out_of_range e) {
-      throw Error(0, "", fmt::format("Undefined variable {}.", name.lexem));
     }
+
+    if (enclosing) {
+      return enclosing.value()->get(name);
+    }
+
+    throw Error(0, "", fmt::format("Undefined variable {}.", name.lexem));
   }
 
   void assign(const Token &name, ExprPtr value) {
     if (m_values.contains(name.lexem)) {
       m_values.insert_or_assign(name.lexem, std::move(value));
       return;
+    } else if (enclosing) {
+      enclosing.value()->assign(name, std::move(value));
+      return;
     }
 
     throw Error(0, "", fmt::format("Undefined variable {}.", name.lexem));
   }
+
+  tl::optional<Environment *> enclosing;
 
 private:
   std::map<std::string, ExprPtr> m_values{};

@@ -49,7 +49,7 @@ target_sources(
 target_link_libraries(
   backend
   PUBLIC lox::util_header
-  PRIVATE fmt::fmt)
+  PRIVATE fmt::fmt tl::optional)
 
 add_executable(lox)
 configure_target(lox)
