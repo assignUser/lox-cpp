@@ -212,3 +212,12 @@ void Interpreter::executeBlock(std::vector<StmtPtr> const &statements) {
     ctx.execute(stmt.get());
   }
 }
+
+void Interpreter::visit(If const &stmt) {
+  evaluate(stmt.condition.get());
+  if (m_result->truthy()) {
+    execute(stmt.then_branch.get());
+  } else if (stmt.else_branch) {
+    execute(stmt.else_branch.get());
+  }
+}

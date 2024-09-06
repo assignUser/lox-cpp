@@ -113,6 +113,8 @@ StmtPtr Parser::statement() {
     return printStatement();
   } else if (match(Token::Type::LEFT_BRACE)) {
     return Block::make(block());
+  } else if (match(Token::Type::IF)) {
+    return ifStatement();
   } else {
     return expressionStatement();
   }
@@ -122,6 +124,22 @@ StmtPtr Parser::printStatement() {
   ExprPtr value = expression();
   consume(Token::Type::SEMICOLON, "Expect ';' after value.");
   return Print::make(std::move(value));
+}
+
+StmtPtr Parser::ifStatement() {
+  consume(Token::Type::LEFT_PAREN, "Expect '(' after 'if'.");
+  ExprPtr condition = expression();
+  consume(Token::Type::RIGHT_PAREN, "Expect ')' after if condition.");
+
+  StmtPtr then_branch = statement();
+  StmtPtr else_branch = nullptr;
+
+  if (match(Token::Type::ELSE)) {
+    else_branch = statement();
+  }
+
+  return If::make(std::move(condition), std::move(then_branch),
+                  std::move(else_branch));
 }
 
 StmtPtr Parser::expressionStatement() {

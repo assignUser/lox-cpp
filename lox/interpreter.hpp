@@ -57,6 +57,8 @@ public:
     // is correctly restored on error.
   public:
     explicit Context(Interpreter *interp)
+        // Following the recursive approach in the book, an iterative approach
+        // would make this easier and faster
         : m_interp{interp}, m_previous(std::move(interp->m_env)) {
       m_interp->m_env = Environment(&m_previous);
     }
@@ -96,6 +98,7 @@ public:
   void visit(Print const &stmt) override;
   void visit(Var const &stmt) override;
   void visit(Block const &stmt) override;
+  void visit(If const &stmt) override;
 
 private:
   void evaluate(Expr const *expr);

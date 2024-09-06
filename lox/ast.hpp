@@ -28,6 +28,7 @@ class Expression;
 class Print;
 class Var;
 class Block;
+class If;
 using StmtPtr = std::unique_ptr<Stmt>;
 
 class Visitor {
@@ -48,6 +49,7 @@ public:
   virtual void visit(Print const &stmt) = 0;
   virtual void visit(Var const &stmt) = 0;
   virtual void visit(Block const &stmt) = 0;
+  virtual void visit(If const &stmt) = 0;
 
 protected:
   Visitor() = default;
@@ -380,7 +382,7 @@ private:
 
 class Stmt {
 public:
-  enum class StmtKind { Expression, Print, Var, Block };
+  enum class StmtKind { Expression, Print, Var, Block, If };
 
   Stmt(const Stmt &) = default;
   Stmt(Stmt &&) = delete;
@@ -505,4 +507,37 @@ public:
 private:
   explicit Block(std::vector<StmtPtr> stmts)
       : Stmt(Stmt::StmtKind::Block), statements{std::move(stmts)} {}
+};
+
+class If : public Stmt {
+public:
+  [[nodiscard]] static StmtPtr make(ExprPtr condition, StmtPtr then_stmt,
+                                    StmtPtr else_stmt) {
+    return std::unique_ptr<Stmt>(new If{
+        std::move(condition), std::move(then_stmt), std::move(else_stmt)});
+  }
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  static bool classof(const Stmt &stmt) {
+    return stmt.getKind() == Stmt::StmtKind::If;
+  }
+
+  [[nodiscard]] bool equals(Stmt const &other) const override {
+    if (not isA<If>(other)) {
+      return false;
+    }
+
+    return condition->equals(*stmt_as<If>(other).condition) &&
+           then_branch->equals(*stmt_as<If>(other).then_branch) &&
+           else_branch->equals(*stmt_as<If>(other).else_branch);
+  }
+
+  ExprPtr condition;
+  StmtPtr then_branch;
+  StmtPtr else_branch;
+
+private:
+  explicit If(ExprPtr cond, StmtPtr then_stmt, StmtPtr else_stmt)
+      : Stmt(Stmt::StmtKind::If), condition{std::move(cond)},
+        then_branch{std::move(then_stmt)}, else_branch{std::move(else_stmt)} {}
 };
