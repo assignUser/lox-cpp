@@ -11,24 +11,25 @@
 
 #include "lox/token.hpp"
 
+class Expr;
+class Assign;
 class Binary;
 class Boolean;
-class Expr;
 class Grouping;
 class Nil;
 class Number;
 class String;
 class Unary;
 class Variable;
-class Assign;
 using ExprPtr = std::unique_ptr<Expr>;
 
 class Stmt;
+class Block;
 class Expression;
+class If;
 class Print;
 class Var;
-class Block;
-class If;
+class While;
 using StmtPtr = std::unique_ptr<Stmt>;
 
 class Visitor {
@@ -50,6 +51,7 @@ public:
   virtual void visit(Var const &stmt) = 0;
   virtual void visit(Block const &stmt) = 0;
   virtual void visit(If const &stmt) = 0;
+  virtual void visit(While const &stmt) = 0;
 
 protected:
   Visitor() = default;
@@ -62,6 +64,7 @@ protected:
 class Expr {
 public:
   enum class ExprKind {
+    Assign,
     Binary,
     Boolean,
     Grouping,
@@ -69,8 +72,7 @@ public:
     Number,
     String,
     Unary,
-    Variable,
-    Assign
+    Variable
   };
 
   explicit Expr(ExprKind kind) : m_kind(kind) {}
@@ -382,7 +384,7 @@ private:
 
 class Stmt {
 public:
-  enum class StmtKind { Expression, Print, Var, Block, If };
+  enum class StmtKind { Expression, Block, If, Print, Var, While };
 
   Stmt(const Stmt &) = default;
   Stmt(Stmt &&) = delete;
@@ -540,4 +542,34 @@ private:
   explicit If(ExprPtr cond, StmtPtr then_stmt, StmtPtr else_stmt)
       : Stmt(Stmt::StmtKind::If), condition{std::move(cond)},
         then_branch{std::move(then_stmt)}, else_branch{std::move(else_stmt)} {}
+};
+
+class While : public Stmt {
+public:
+  [[nodiscard]] static StmtPtr make(ExprPtr condition, StmtPtr body) {
+    return std::unique_ptr<Stmt>(
+        new While{std::move(condition), std::move(body)});
+  }
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  static bool classof(const Stmt &stmt) {
+    return stmt.getKind() == Stmt::StmtKind::While;
+  }
+
+  [[nodiscard]] bool equals(Stmt const &other) const override {
+    if (not isA<While>(other)) {
+      return false;
+    }
+
+    return condition->equals(*stmt_as<While>(other).condition) &&
+           body->equals(*stmt_as<While>(other).body);
+  }
+
+  ExprPtr condition;
+  StmtPtr body;
+
+private:
+  explicit While(ExprPtr cond, StmtPtr body)
+      : Stmt(Stmt::StmtKind::While), condition{std::move(cond)},
+        body{std::move(body)} {}
 };

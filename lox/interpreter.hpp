@@ -99,6 +99,7 @@ public:
   void visit(Var const &stmt) override;
   void visit(Block const &stmt) override;
   void visit(If const &stmt) override;
+  void visit(While const &stmt) override;
 
 private:
   void evaluate(Expr const *expr);

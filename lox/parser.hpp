@@ -40,9 +40,13 @@ private:
   StmtPtr printStatement();
   StmtPtr expressionStatement();
   StmtPtr ifStatement();
+  StmtPtr whileStatement();
+  StmtPtr forStatement();
   std::vector<StmtPtr> block();
   ExprPtr expression();
   ExprPtr assignment();
+  ExprPtr logicOr();
+  ExprPtr logicAnd();
   ExprPtr equality();
   ExprPtr comparison();
   ExprPtr term();

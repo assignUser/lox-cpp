@@ -11,7 +11,7 @@
 
 void Interpreter::evaluate(Expr const *expr) { expr->accept(*this); }
 void Interpreter::execute(Stmt const *stmt) { stmt->accept(*this); }
-
+// TODO ExprPtr makes no sense as return, rather use exit codes or error?
 ExprPtr Interpreter::interpret(std::vector<StmtPtr> const &statements) {
   try {
     for (auto const &stmt : statements) {
@@ -44,20 +44,37 @@ ExprPtr Interpreter::interpret(Expr const *expr) {
 
 void Interpreter::visit(Binary const &expr) {
   evaluate(expr.lhs.get());
+  // short-circuit `and` and `or`
+  // I am not totally sold on using these as control flow with returning the
+  // operand vs always returning a Boolean but I'll follow the  book for now.
+  if (expr.op.type == Token::Type::AND and not m_result->truthy()) {
+    // `and` returns the left operand if `false` and rhs otherwise
+    return;
+  } else if (expr.op.type == Token::Type::OR and m_result->truthy()) {
+    // `or` returns the lhs if `true` and rhs otherwise
+    return;
+  }
+  // post-pone move until after short-circuit evaluation
   ExprPtr lhs{std::move(m_result)};
+
   evaluate(expr.rhs.get());
-  ExprPtr rhs{std::move(m_result)};
 
   switch (expr.op.type) {
   case Token::Type::EQUAL_EQUAL:
-    m_result = Boolean::make(rhs->equals(*lhs));
+    m_result = Boolean::make(m_result->equals(*lhs));
     return;
   case Token::Type::BANG_EQUAL:
-    m_result = Boolean::make(not rhs->equals(*lhs));
+    m_result = Boolean::make(not m_result->equals(*lhs));
+    return;
+  case Token::Type::AND:
+  case Token::Type::OR:
+    // m_result = rhs
     return;
   default:
     break;
   }
+
+  ExprPtr rhs{std::move(m_result)};
 
   if (isA<Number>(*lhs) and isA<Number>(*rhs)) {
     switch (expr.op.type) {
@@ -219,5 +236,13 @@ void Interpreter::visit(If const &stmt) {
     execute(stmt.then_branch.get());
   } else if (stmt.else_branch) {
     execute(stmt.else_branch.get());
+  }
+}
+
+void Interpreter::visit(While const &stmt) {
+  evaluate(stmt.condition.get());
+  while (m_result->truthy()) {
+    execute(stmt.body.get());
+    evaluate(stmt.condition.get());
   }
 }

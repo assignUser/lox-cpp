@@ -5,6 +5,7 @@
 
 #include "lox/ast.hpp"
 #include "lox/error.hpp"
+#include "lox/token.hpp"
 #include <vector>
 
 Token const &Parser::advance() {
@@ -115,6 +116,10 @@ StmtPtr Parser::statement() {
     return Block::make(block());
   } else if (match(Token::Type::IF)) {
     return ifStatement();
+  } else if (match(Token::Type::WHILE)) {
+    return whileStatement();
+  } else if (match(Token::Type::FOR)) {
+    return forStatement();
   } else {
     return expressionStatement();
   }
@@ -142,6 +147,64 @@ StmtPtr Parser::ifStatement() {
                   std::move(else_branch));
 }
 
+StmtPtr Parser::whileStatement() {
+  consume(Token::Type::LEFT_PAREN, "Expect '(' after 'while'.");
+  ExprPtr condition = expression();
+  consume(Token::Type::RIGHT_PAREN, "Expect ')' after condition.");
+  StmtPtr body = statement();
+
+  return While::make(std::move(condition), std::move(body));
+}
+
+StmtPtr Parser::forStatement() {
+  consume(Token::Type::LEFT_PAREN, "Expect '(' after 'for'.");
+  StmtPtr initializer;
+  if (match(Token::Type::SEMICOLON)) {
+    // initializer omitted
+  } else if (match(Token::Type::VAR)) {
+    initializer = varDeclaration();
+  } else {
+    initializer = expressionStatement();
+  }
+
+  ExprPtr condition;
+  if (not check(Token::Type::SEMICOLON)) {
+    condition = expression();
+  }
+  consume(Token::Type::SEMICOLON, "Expect ';' after loop condition.");
+
+  ExprPtr increment;
+  if (not check(Token::Type::RIGHT_PAREN)) {
+    increment = expression();
+  }
+  consume(Token::Type::RIGHT_PAREN, "Expect ')' after for clauses.");
+
+  StmtPtr body = statement();
+
+  if (increment) {
+    std::vector<StmtPtr> stmts;
+    // TODO what's the issue with construct_at?
+    stmts.push_back(std::move(body));
+    stmts.push_back(Expression::make(std::move(increment)));
+    body = Block::make(std::move(stmts));
+  }
+
+  if (not condition) {
+    condition = Boolean::make(true);
+  }
+  body = While::make(std::move(condition), std::move(body));
+
+  if (initializer) {
+    std::vector<StmtPtr> stmts;
+    stmts.push_back(std::move(initializer));
+    stmts.push_back(std::move(body));
+
+    body = Block::make(std::move(stmts));
+  }
+
+  return body;
+}
+
 StmtPtr Parser::expressionStatement() {
   ExprPtr expr = expression();
   consume(Token::Type::SEMICOLON, "Expect ';' after Expression.");
@@ -164,7 +227,7 @@ ExprPtr Parser::expression() { return assignment(); }
 
 // assignment     → IDENTIFIER "=" assignment | equality;
 ExprPtr Parser::assignment() {
-  ExprPtr expr = equality();
+  ExprPtr expr = logicOr();
 
   if (match(Token::Type::EQUAL)) {
     Token equals = previous();
@@ -177,6 +240,30 @@ ExprPtr Parser::assignment() {
     m_hasError = true;
     // casting to void explicitly disables the `[[nodiscard]]` warning
     (void)error(equals, "Invalid assignment target");
+  }
+
+  return expr;
+}
+
+ExprPtr Parser::logicOr() {
+  ExprPtr expr = logicAnd();
+
+  while (match(Token::Type::OR)) {
+    Token op = previous();
+    ExprPtr rhs = logicAnd();
+    expr = Binary::make(std::move(expr), op, std::move(rhs));
+  }
+
+  return expr;
+}
+
+ExprPtr Parser::logicAnd() {
+  ExprPtr expr = equality();
+
+  while (match(Token::Type::AND)) {
+    Token op = previous();
+    ExprPtr rhs = equality();
+    expr = Binary::make(std::move(expr), op, std::move(rhs));
   }
 
   return expr;
