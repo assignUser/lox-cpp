@@ -66,6 +66,18 @@ target_link_libraries(
           tl::optional
           bfg::lyra)
 
-if(BUILD_TESTING)
-  # add_subdirectory(tests)
+find_program(dart_bin dart)
+if(NOT ${dart_bin} STREQUAL dart-NOTFOUND)
+  add_custom_command(
+    OUTPUT ${lox_tests_SOURCE_DIR}/tool/dart_deps_installed
+    COMMAND ${dart_bin} pub get
+    COMMAND touch dart_deps_installed
+    WORKING_DIRECTORY ${lox_tests_SOURCE_DIR}/tool)
+  add_custom_target(install_dart_deps DEPENDS ${lox_tests_SOURCE_DIR}/tool/dart_deps_installed)
+  add_dependencies(lox install_dart_deps)
+
+  add_test(
+    NAME lox-validation
+    COMMAND ${dart_bin} tool/bin/test.dart chap09_control -i ${lox_BINARY_DIR}/lox/lox
+    WORKING_DIRECTORY ${lox_tests_SOURCE_DIR})
 endif()

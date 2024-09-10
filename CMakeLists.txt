@@ -55,27 +55,19 @@ FetchContent_Declare(
 list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
 
 FetchContent_Declare(
-  cupcake.cmake
-  URL https://github.com/thejohnfreeman/cupcake/archive/refs/tags/1.1.1.tar.gz
-  URL_HASH SHA256=e9ac3953ac64020dd943a16aa908611960d1fa96c2febea81cd19d26493c4ef4
-  OVERRIDE_FIND_PACKAGE)
-
-FetchContent_Declare(
-  autocheck
-  URL https://github.com/thejohnfreeman/autocheck/archive/refs/tags/1.1.1.tar.gz
-  URL_HASH SHA256=4b5442f25910d56c9b93dcaa7845e18e2de15948da52c938c04ddb0fb1caca9b)
+  lox_tests
+  GIT_REPOSITORY https://github.com/munificent/craftinginterpreters
+  GIT_TAG 4a840f70f69c6ddd17cfef4f6964f8e1bcd8c3d4
+)
 
 FetchContent_MakeAvailable(
   tl_expected
   tl_optional
   fmt
   lyra
-  catch2
-  cupcake.cmake
-  autocheck)
+  lox_tests)
 
 set(BUILD_TESTING ON)
 include(CTest)
-include(Catch)
 
 add_subdirectory(lox)
