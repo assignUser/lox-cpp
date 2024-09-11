@@ -28,4 +28,4 @@ clean-all:
   rm -rf build/*
 
 watch:
-  find lox/ | entr -s 'ninja -C build && ctest --output-on-failure --stop-on-failure --no-tests=error --test-dir build/'
+  find lox/ | entr -s "ninja -C build && ctest --output-on-failure --stop-on-failure --no-tests=error --test-dir build/ | grep -v '^Passed:'"
