@@ -207,7 +207,7 @@ StmtPtr Parser::forStatement() {
 
 StmtPtr Parser::expressionStatement() {
   ExprPtr expr = expression();
-  consume(Token::Type::SEMICOLON, "Expect ';' after Expression.");
+  consume(Token::Type::SEMICOLON, "Expect ';' after expression.");
   return Expression::make(std::move(expr));
 }
 
@@ -239,7 +239,7 @@ ExprPtr Parser::assignment() {
     }
     m_hasError = true;
     // casting to void explicitly disables the `[[nodiscard]]` warning
-    (void)error(equals, "Invalid assignment target");
+    (void)error(equals, "Invalid assignment target.");
   }
 
   return expr;
@@ -347,7 +347,7 @@ ExprPtr Parser::primary() {
   } else if (match(Token::Type::LEFT_PAREN)) {
     ExprPtr expr = expression();
     // consume should use unexpected?
-    consume(Token::Type::RIGHT_PAREN, "Expect ')' after Expression.");
+    consume(Token::Type::RIGHT_PAREN, "Expect ')' after expression.");
     return Grouping::make(std::move(expr));
   } else {
     throw error(peek(), "Expect expression.");
