@@ -17,7 +17,7 @@ ExprPtr Interpreter::interpret(std::vector<StmtPtr> const &statements) {
     for (auto const &stmt : statements) {
       execute(stmt.get());
     }
-  } catch (Error e) {
+  } catch (RuntimeError e) {
     m_hasError = true;
     report(e);
     m_result = Nil::make();
@@ -31,7 +31,7 @@ ExprPtr Interpreter::interpret(std::vector<StmtPtr> const &statements) {
 ExprPtr Interpreter::interpret(Expr const *expr) {
   try {
     evaluate(expr);
-  } catch (Error e) {
+  } catch (RuntimeError e) {
     m_hasError = true;
     report(e);
     m_result = Nil::make();
@@ -111,11 +111,10 @@ void Interpreter::visit(Binary const &expr) {
                                expr_as<Number>(*rhs).value);
       break;
     default:
-      throw Error{
-          0, "",
-          fmt::format(
-              "Invalid operator '{}' for binary expression <Number op Number>.",
-              expr.op.lexem)};
+      throw RuntimeError{expr.op,
+                         fmt::format("Invalid operator '{0}' for binary "
+                                     "expression `Number {0} Number`.",
+                                     expr.op.lexem)};
     }
     return;
   }
@@ -126,19 +125,19 @@ void Interpreter::visit(Binary const &expr) {
                               expr_as<String>(*rhs).value);
       return;
     } else {
-      throw Error{
-          0, "",
-          fmt::format(
-              "Invalid operator '{}' for binary expression <String op String>.",
-              expr.op.lexem)};
+      throw RuntimeError{expr.op,
+                         fmt::format("Invalid operator '{0}' for binary "
+                                     "expression `String {0} String`.",
+                                     expr.op.lexem)};
     }
   }
 
   // invalid operator or operands
-  throw Error{
-      0, "",
-      fmt::format("Invalid operator '{}' for binary expression <{} op {}>.",
-                  expr.op.lexem, expr.rhs->getKind(), expr.lhs->getKind())};
+  throw RuntimeError{
+      expr.op,
+      fmt::format("Invalid operator '{0}' for binary expression `{1} {0} {2}`.",
+                  expr.op.lexem, expr.lhs->getKind(), expr.rhs->getKind()),
+  };
 }
 
 void Interpreter::visit(Boolean const &expr) {
@@ -166,8 +165,8 @@ void Interpreter::visit(Unary const &expr) {
     if (isA<Number>(*rhs)) {
       m_result = Number::make(-expr_as<Number>(*rhs).value);
     } else {
-      throw Error{
-          0, "",
+      throw RuntimeError{
+          expr.op,
           fmt::format("Invalid operand '{}' for unary '-'.", rhs->getKind())};
     }
 
@@ -177,9 +176,9 @@ void Interpreter::visit(Unary const &expr) {
     //  e.g. !(false) = false instead of true because Grouping is truthy
     m_result = Boolean::make(not rhs->truthy());
   } else {
-    throw Error{0, "",
-                fmt::format("Invalid operator '{}' for unary expression.",
-                            expr.op.type)};
+    throw RuntimeError{
+        expr.op, fmt::format("Invalid operator '{}' for unary expression.",
+                             expr.op.type)};
   }
 }
 
@@ -194,10 +193,11 @@ void Interpreter::visit(Print const &stmt) {
   } else if (isA<Boolean>(*m_result)) {
     fmt::println("{}", expr_as<Boolean>(*m_result).value);
   } else if (isA<Nil>(*m_result)) {
-    fmt::println("Nil");
+    fmt::println("nil");
   } else {
-    throw Error{0, "",
-                fmt::format("Unexpected result type {}.", m_result->getKind())};
+    throw RuntimeError{
+        Token{Token::Type::NIL, "", "", 0},
+        fmt::format("Unexpected result type {}.", m_result->getKind())};
   }
 }
 

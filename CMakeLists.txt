@@ -56,8 +56,8 @@ list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
 
 FetchContent_Declare(
   lox_tests
-  GIT_REPOSITORY https://github.com/munificent/craftinginterpreters
-  GIT_TAG 4a840f70f69c6ddd17cfef4f6964f8e1bcd8c3d4
+  GIT_REPOSITORY https://github.com/assignUser/craftinginterpreters
+  GIT_TAG improved-runtime-errors
 )
 
 FetchContent_MakeAvailable(

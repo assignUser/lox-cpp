@@ -29,7 +29,7 @@ public:
       return enclosing->get(name);
     }
 
-    throw Error(0, "", fmt::format("Undefined variable {}.", name.lexem));
+    throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
   }
 
   void assign(const Token &name, ExprPtr value) {
@@ -41,7 +41,7 @@ public:
       return;
     }
 
-    throw Error(0, "", fmt::format("Undefined variable {}.", name.lexem));
+    throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
   }
 
   Environment *enclosing;
