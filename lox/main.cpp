@@ -88,7 +88,7 @@ tl::expected<int, Error> run(std::string_view source) {
     for (auto const &error : scanner.getErrors()) {
       report(error);
     }
-    return tl::unexpected(Error{0, "", "Error while scanning."});
+    return 65;
   }
 
   auto parser = Parser{tokens};
@@ -99,13 +99,13 @@ tl::expected<int, Error> run(std::string_view source) {
 
   if (parser.hasError()){
     // Don't run interpreter on input with parser error.
-    return 1;
+    return 65;
   }
 
   static Interpreter interpreter{};
   interpreter.interpret(statements.value());
   if (interpreter.hasError()) {
-    return 1;
+    return 70;
   }
 
   return 0;
