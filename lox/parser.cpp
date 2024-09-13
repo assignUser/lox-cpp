@@ -8,6 +8,7 @@
 #include "lox/error.hpp"
 #include "lox/expressions.hpp"
 #include "lox/statements.hpp"
+
 Token const &Parser::advance() {
   if (not atEnd()) {
     m_current++;
@@ -86,6 +87,8 @@ StmtPtr Parser::declaration() {
   try {
     if (match(Token::Type::VAR)) {
       return varDeclaration();
+    } else if (match(Token::Type::FUN)) {
+      return function("function");
     }
 
     return statement();
@@ -95,6 +98,39 @@ StmtPtr Parser::declaration() {
     synchronize();
     return Expression::make(Nil::make());
   }
+}
+StmtPtr Parser::function(std::string const &kind) {
+  Token name =
+      consume(Token::Type::IDENTIFIER, fmt::format("Expect {} name.", kind));
+
+  consume(Token::Type::LEFT_PAREN,
+          fmt::format("Expect '(' after {} name.", kind));
+
+  std::vector<Token> parameters{};
+  auto consume_identifier = [&]() {
+    parameters.push_back(
+        consume(Token::Type::IDENTIFIER, "Expect parameter name."));
+  };
+
+  if (not check(Token::Type::RIGHT_PAREN)) {
+    consume_identifier();
+
+    while (match(Token::Type::COMMA)) {
+      if (parameters.size() >= 255) {
+        (void)error(peek(), "Can't have more than 255 parameters.");
+      }
+
+      consume_identifier();
+    }
+  }
+  consume(Token::Type::RIGHT_PAREN, "Expect ')' after parameters.");
+
+  consume(Token::Type::LEFT_BRACE,
+          fmt::format("Expect '{{' before {} body.", kind));
+  std::vector<StmtPtr> body = block();
+
+  return FunctionStmt::make(std::move(name), std::move(parameters),
+                            std::move(body));
 }
 
 StmtPtr Parser::varDeclaration() {
@@ -326,7 +362,45 @@ ExprPtr Parser::unary() {
     ExprPtr rhs = unary();
     return Unary::make(op, std::move(rhs));
   }
-  return primary();
+  return call();
+}
+
+// call → primary ( "(" arguments? ")" )* ;
+ExprPtr Parser::call() {
+  ExprPtr expr = primary();
+
+  while (true) {
+    if (match(Token::Type::LEFT_PAREN)) {
+      expr = finishCall(std::move(expr));
+    } else {
+      break;
+    }
+  }
+
+  return expr;
+}
+
+// arguments → expression ( "," expression )* ;
+ExprPtr Parser::finishCall(ExprPtr callee) {
+  std::vector<ExprPtr> arguments;
+
+  if (not check(Token::Type::RIGHT_PAREN)) {
+    arguments.push_back(expression());
+
+    while (match(Token::Type::COMMA)) {
+      if (arguments.size() >= 255) {
+        m_hasError = true;
+        // casting to void explicitly disables the `[[nodiscard]]` warning
+        (void)error(peek(), "Can't have more than 255 arguments.");
+      }
+      arguments.push_back(expression());
+    }
+  }
+
+  Token paren =
+      consume(Token::Type::RIGHT_PAREN, "Expect ')' after arguments.");
+
+  return Call::make(std::move(callee), std::move(paren), std::move(arguments));
 }
 
 // primary → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")";

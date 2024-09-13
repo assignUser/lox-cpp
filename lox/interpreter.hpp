@@ -5,12 +5,15 @@
 
 #include "lox/error.hpp"
 #include "lox/fwd.hpp"
+
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 class Environment {
 public:
-  explicit Environment(Environment *encl = nullptr) : enclosing{encl} {}
+  Environment() = default;
+  explicit Environment(Environment *encl) : enclosing{encl} {}
 
   void define(const std::string &name, ExprPtr value) {
     m_values.insert_or_assign(name, std::move(value));
@@ -18,7 +21,7 @@ public:
 
   Expr const &get(const Token &name) {
     if (name.type != Token::Type::IDENTIFIER) {
-      throw "Token not an identifier";
+      throw RuntimeError(name, "Token not an identifier");
     }
 
     if (m_values.contains(name.lexem)) {
@@ -29,7 +32,8 @@ public:
       return enclosing->get(name);
     }
 
-    throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
+    throw RuntimeError(name,
+                       fmt::format("Undefined variable '{}'.", name.lexem));
   }
 
   void assign(const Token &name, ExprPtr value) {
@@ -41,10 +45,11 @@ public:
       return;
     }
 
-    throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
+    throw RuntimeError(name,
+                       fmt::format("Undefined variable '{}'.", name.lexem));
   }
 
-  Environment *enclosing;
+  Environment *enclosing{nullptr};
 
 private:
   std::map<std::string, ExprPtr> m_values{};
@@ -56,12 +61,18 @@ public:
     // RAII alternative to Javas try{}finally to ensure the previous environment
     // is correctly restored on error.
   public:
-    explicit Context(Interpreter *interp)
+    explicit Context(Interpreter *interp) : Context(interp, nullptr) {}
+    Context(Interpreter *interp, Environment *parent)
         // Following the recursive approach in the book, an iterative approach
         // would make this easier and faster
         : m_interp{interp}, m_previous(std::move(interp->m_env)) {
-      m_interp->m_env = Environment(&m_previous);
+      if (parent) {
+        m_interp->m_env = Environment(parent);
+      } else {
+        m_interp->m_env = Environment(&m_previous);
+      }
     }
+
     Context(const Context &) = default;
     Context(Context &&) = default;
     Context &operator=(const Context &) = default;
@@ -75,6 +86,10 @@ public:
     Environment m_previous;
   };
 
+  Interpreter() : globals{} {
+    importStd();
+    m_env = Environment{&globals};
+  }
   ExprPtr interpret(std::vector<StmtPtr> const &statements);
   ExprPtr interpret(Expr const *expr);
   bool hasError() { return m_hasError; }
@@ -83,6 +98,8 @@ public:
     m_tmp.reset();
     m_hasError = false;
   }
+  void executeBlock(std::vector<StmtPtr> const &statements,
+                    Environment *parent_env = nullptr);
 
   void visit(Binary const &expr) override;
   void visit(Boolean const &expr) override;
@@ -93,6 +110,8 @@ public:
   void visit(Unary const &expr) override;
   void visit(Variable const &expr) override;
   void visit(Assign const &expr) override;
+  void visit(Call const &expr) override;
+  void visit(Function const &expr) override;
   // statements
   void visit(Expression const &stmt) override;
   void visit(Print const &stmt) override;
@@ -100,11 +119,15 @@ public:
   void visit(Block const &stmt) override;
   void visit(If const &stmt) override;
   void visit(While const &stmt) override;
+  void visit(FunctionStmt const &stmt) override;
+
+  Environment globals;
 
 private:
   void evaluate(Expr const *expr);
   void execute(Stmt const *stmt);
-  void executeBlock(std::vector<StmtPtr> const &statements);
+  void importStd();
+
   ExprPtr m_result;
   ExprPtr m_tmp;
   bool m_hasError{false};

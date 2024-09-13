@@ -6,10 +6,39 @@
 
 #include "lox/expressions.hpp"
 #include "lox/statements.hpp"
+
 #include "fmt/format.h"
 
+#include <chrono>
 #include <fmt/core.h>
 #include <memory>
+#include <vector>
+
+namespace lox_std {
+class Clock : public NativeFunction {
+public:
+  [[nodiscard]] static ExprPtr make() {
+    return std::unique_ptr<Clock>(new Clock());
+  }
+  [[nodiscard]] ExprPtr clone() const override { return Clock::make(); }
+  [[nodiscard]] bool equals(Expr const &other) const override { return false; }
+  [[nodiscard]] size_t arity() const noexcept override { return 0; };
+  ExprPtr call(Interpreter &interpreter,
+               std::vector<ExprPtr> arguments) const override {
+    return Number::make(std::chrono::duration_cast<std::chrono::seconds>(
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count());
+  }
+
+private:
+  explicit Clock() : NativeFunction() {}
+  std::chrono::steady_clock m_clock{};
+};
+} // namespace lox_std
+
+void Interpreter::importStd() {
+  globals.define("clock", lox_std::Clock::make());
+}
 
 void Interpreter::evaluate(Expr const *expr) { expr->accept(*this); }
 void Interpreter::execute(Stmt const *stmt) { stmt->accept(*this); }
@@ -196,6 +225,10 @@ void Interpreter::visit(Print const &stmt) {
     fmt::println("{}", expr_as<Boolean>(*m_result).value);
   } else if (isA<Nil>(*m_result)) {
     fmt::println("nil");
+  } else if (isA<Function>(*m_result)) {
+    fmt::println("<fn {}>", stmt_as<FunctionStmt>(
+                                *expr_as<Function>(*m_result).declaration)
+                                .name.lexem);
   } else {
     throw RuntimeError{
         Token{Token::Type::NIL, "", "", 0},
@@ -224,8 +257,9 @@ void Interpreter::visit(Assign const &expr) {
 
 void Interpreter::visit(Block const &stmt) { executeBlock(stmt.statements); }
 
-void Interpreter::executeBlock(std::vector<StmtPtr> const &statements) {
-  Context ctx{this};
+void Interpreter::executeBlock(std::vector<StmtPtr> const &statements,
+                               Environment *parent_env) {
+  Context ctx{this, parent_env};
 
   for (auto const &stmt : statements) {
     ctx.execute(stmt.get());
@@ -247,4 +281,33 @@ void Interpreter::visit(While const &stmt) {
     execute(stmt.body.get());
     evaluate(stmt.condition.get());
   }
+}
+
+void Interpreter::visit(Call const &expr) {
+  evaluate(expr.callee.get());
+  ExprPtr callee = std::move(m_result);
+  if (not callee->isCallable()) {
+    throw RuntimeError{expr.paren, "Can only call functions and classes."};
+  }
+
+  std::vector<ExprPtr> arguments;
+  for (ExprPtr const &argument : expr.arguments) {
+    evaluate(argument.get());
+    arguments.push_back(std::move(m_result));
+  }
+
+  auto const &function = dynamic_cast<Callable&>(*callee);
+
+  if (arguments.size() != function.arity()) {
+    throw RuntimeError{expr.paren,
+                       fmt::format("Expected {} arguments but got {}.",
+                                   function.arity(), arguments.size())};
+  }
+
+  m_result = function.call(*this, std::move(arguments));
+}
+
+void Interpreter::visit(Function const &expr) { ; }
+void Interpreter::visit(FunctionStmt const &stmt) {
+  m_env.define(stmt.name.lexem, Function::make(stmt.clone()));
 }

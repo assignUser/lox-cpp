@@ -35,6 +35,7 @@ private:
   // ast
   StmtPtr varDeclaration();
   StmtPtr declaration();
+  StmtPtr function(std::string const &kind);
   StmtPtr statement();
   StmtPtr printStatement();
   StmtPtr expressionStatement();
@@ -51,6 +52,8 @@ private:
   ExprPtr term();
   ExprPtr factor();
   ExprPtr unary();
+  ExprPtr call();
+  ExprPtr finishCall(ExprPtr callee);
   ExprPtr primary();
 
   std::vector<Token> m_tokens{};
