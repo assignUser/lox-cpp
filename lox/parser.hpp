@@ -11,8 +11,7 @@
 
 #include <tl/expected.hpp>
 
-#include "lox/ast.hpp"
-#include "lox/error.hpp"
+#include "lox/fwd.hpp"
 #include "lox/token.hpp"
 
 class Parser {

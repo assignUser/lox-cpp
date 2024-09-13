@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // SPDX-FileCopyrightText: Copyright (c) assignUser
+#pragma once
 
-#include "lox/ast.hpp"
 #include "lox/error.hpp"
+#include "lox/fwd.hpp"
 #include <stdexcept>
-#include <tl/optional.hpp>
 #include <vector>
 
 class Environment {

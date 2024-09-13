@@ -10,7 +10,7 @@
 #include <fmt/core.h>
 #include <stdexcept>
 
-#include "lox/ast.hpp"
+#include "lox/expressions.hpp"
 #include "lox/token.hpp"
 
 enum class ResultType { NUMBER, BOOLEAN, NIL, UNDEFINED };

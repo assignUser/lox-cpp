@@ -1,21 +1,25 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # SPDX-FileCopyrightText: Copyright (c) assignUser
-add_library(util_header INTERFACE)
+add_library(util_header)
 configure_target(util_header)
 target_sources(
   util_header
-  INTERFACE FILE_SET
+  PUBLIC FILE_SET
             HEADERS
             BASE_DIRS
             ${PROJECT_SOURCE_DIR}
             FILES
-            ast.hpp
+            expressions.hpp
             error.hpp
+            statements.hpp
             token.hpp)
+
+target_sources(util_header PUBLIC statements.cpp)
+
 target_link_libraries(
   util_header
-  INTERFACE fmt::fmt)
+  PUBLIC fmt::fmt)
 
 add_library(frontend)
 configure_target(frontend)

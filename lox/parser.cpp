@@ -3,11 +3,11 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include "lox/parser.hpp"
 
-#include "lox/ast.hpp"
-#include "lox/error.hpp"
-#include "lox/token.hpp"
 #include <vector>
 
+#include "lox/error.hpp"
+#include "lox/expressions.hpp"
+#include "lox/statements.hpp"
 Token const &Parser::advance() {
   if (not atEnd()) {
     m_current++;

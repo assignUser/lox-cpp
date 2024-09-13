@@ -15,7 +15,8 @@
 #include "lyra/help.hpp"
 #include "tl/expected.hpp"
 
-#include "lox/ast.hpp"
+#include "lox/expressions.hpp"
+#include "lox/statements.hpp"
 #include "lox/error.hpp"
 #include "lox/interpreter.hpp"
 #include "lox/parser.hpp"

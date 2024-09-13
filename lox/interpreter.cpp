@@ -4,6 +4,8 @@
 
 #include "lox/interpreter.hpp"
 
+#include "lox/expressions.hpp"
+#include "lox/statements.hpp"
 #include "fmt/format.h"
 
 #include <fmt/core.h>

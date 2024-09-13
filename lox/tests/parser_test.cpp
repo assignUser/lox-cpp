@@ -20,7 +20,7 @@
 #include <tuple>
 #include <vector>
 
-#include "lox/ast.hpp"
+#include "lox/expressions.hpp"
 #include "lox/parser.hpp"
 #include "lox/scanner.hpp"
 
