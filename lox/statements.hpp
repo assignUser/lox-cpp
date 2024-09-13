@@ -335,6 +335,9 @@ private:
 class NativeFunction : public Expr, public Callable {
 public:
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::NativeFunction;
+  }
   [[nodiscard]] bool truthy() const override { return true; }
   [[nodiscard]] bool isCallable() const noexcept override { return true; }
 

@@ -229,6 +229,8 @@ void Interpreter::visit(Print const &stmt) {
     fmt::println("<fn {}>", stmt_as<FunctionStmt>(
                                 *expr_as<Function>(*m_result).declaration)
                                 .name.lexem);
+  } else if (isA<NativeFunction>(*m_result)) {
+    fmt::println("<native fn>");
   } else {
     throw RuntimeError{
         Token{Token::Type::NIL, "", "", 0},
@@ -296,7 +298,7 @@ void Interpreter::visit(Call const &expr) {
     arguments.push_back(std::move(m_result));
   }
 
-  auto const &function = dynamic_cast<Callable&>(*callee);
+  auto const &function = dynamic_cast<Callable &>(*callee);
 
   if (arguments.size() != function.arity()) {
     throw RuntimeError{expr.paren,
