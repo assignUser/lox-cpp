@@ -10,6 +10,8 @@
 #include <utility>
 #include <vector>
 
+#include <tl/optional.hpp>
+
 class Environment {
 public:
   Environment() = default;
@@ -29,7 +31,7 @@ public:
     }
 
     if (enclosing) {
-      return enclosing->get(name);
+      return (*enclosing)->get(name);
     }
 
     throw RuntimeError(name,
@@ -41,7 +43,7 @@ public:
       m_values.insert_or_assign(name.lexem, std::move(value));
       return;
     } else if (enclosing) {
-      enclosing->assign(name, std::move(value));
+      (*enclosing)->assign(name, std::move(value));
       return;
     }
 
@@ -49,7 +51,7 @@ public:
                        fmt::format("Undefined variable '{}'.", name.lexem));
   }
 
-  Environment *enclosing{nullptr};
+  tl::optional<Environment *> enclosing{tl::nullopt};
 
 private:
   std::map<std::string, ExprPtr> m_values{};
@@ -61,13 +63,13 @@ public:
     // RAII alternative to Javas try{}finally to ensure the previous environment
     // is correctly restored on error.
   public:
-    explicit Context(Interpreter *interp) : Context(interp, nullptr) {}
-    Context(Interpreter *interp, Environment *parent)
+    explicit Context(Interpreter *interp) : Context(interp, tl::nullopt) {}
+    Context(Interpreter *interp, tl::optional<Environment*> parent)
         // Following the recursive approach in the book, an iterative approach
         // would make this easier and faster
         : m_interp{interp}, m_previous(std::move(interp->m_env)) {
       if (parent) {
-        m_interp->m_env = Environment(parent);
+        m_interp->m_env = Environment(*parent);
       } else {
         m_interp->m_env = Environment(&m_previous);
       }
