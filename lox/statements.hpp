@@ -25,7 +25,6 @@ public:
 
   virtual ~Stmt() = default;
   virtual void accept(Visitor &visitor) const = 0;
-  [[nodiscard]] virtual bool equals(Stmt const &other) const = 0;
   [[nodiscard]] StmtKind getKind() const { return m_kind; }
   [[nodiscard]] virtual StmtPtr clone() const = 0;
 
@@ -63,12 +62,6 @@ public:
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Expression;
   }
-  [[nodiscard]] bool equals(Stmt const &other) const override {
-    if (not isA<Expression>(other)) {
-      return false;
-    }
-    return expr->equals(*stmt_as<Expression>(other).expr);
-  }
 
   [[nodiscard]] StmtPtr clone() const override {
     return Expression::make(expr->clone());
@@ -89,12 +82,6 @@ public:
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Print;
-  }
-  [[nodiscard]] bool equals(Stmt const &other) const override {
-    if (not isA<Print>(other)) {
-      return false;
-    }
-    return expr->equals(*stmt_as<Print>(other).expr);
   }
   [[nodiscard]] StmtPtr clone() const override {
     return Print::make(expr->clone());
@@ -118,12 +105,6 @@ public:
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Var;
   }
-  [[nodiscard]] bool equals(Stmt const &other) const override {
-    if (not isA<Var>(other)) {
-      return false;
-    }
-    return initializer->equals(*stmt_as<Var>(other).initializer);
-  }
   [[nodiscard]] StmtPtr clone() const override {
     return Var::make(name, initializer->clone());
   }
@@ -146,13 +127,6 @@ public:
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Block;
-  }
-  [[nodiscard]] bool equals(Stmt const &other) const override {
-    if (not isA<Block>(other)) {
-      return false;
-    }
-
-    return this == &stmt_as<Block>(other);
   }
   [[nodiscard]] StmtPtr clone() const override {
     auto rng = statements | std::views::transform(&StmtPtr::operator*) |
@@ -181,15 +155,6 @@ public:
     return stmt.getKind() == Stmt::StmtKind::If;
   }
 
-  [[nodiscard]] bool equals(Stmt const &other) const override {
-    if (not isA<If>(other)) {
-      return false;
-    }
-
-    return condition->equals(*stmt_as<If>(other).condition) &&
-           then_branch->equals(*stmt_as<If>(other).then_branch) &&
-           else_branch->equals(*stmt_as<If>(other).else_branch);
-  }
   [[nodiscard]] StmtPtr clone() const override {
     return If::make(condition->clone(), then_branch->clone(),
                     else_branch ? else_branch->clone() : nullptr);
@@ -217,14 +182,6 @@ public:
     return stmt.getKind() == Stmt::StmtKind::While;
   }
 
-  [[nodiscard]] bool equals(Stmt const &other) const override {
-    if (not isA<While>(other)) {
-      return false;
-    }
-
-    return condition->equals(*stmt_as<While>(other).condition) &&
-           body->equals(*stmt_as<While>(other).body);
-  }
   [[nodiscard]] StmtPtr clone() const override {
     return While::make(condition->clone(), body->clone());
   }
@@ -249,14 +206,6 @@ public:
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::FunctionStmt;
-  }
-
-  [[nodiscard]] bool equals(Stmt const &other) const override {
-    if (not isA<FunctionStmt>(other)) {
-      return false;
-    }
-
-    return name.lexem == stmt_as<FunctionStmt>(other).name.lexem;
   }
 
   [[nodiscard]] StmtPtr clone() const override {
