@@ -273,7 +273,7 @@ void Interpreter::visit(If const &stmt) {
   if (m_result->truthy()) {
     execute(stmt.then_branch.get());
   } else if (stmt.else_branch) {
-    execute(stmt.else_branch.get());
+    execute(stmt.else_branch->get());
   }
 }
 

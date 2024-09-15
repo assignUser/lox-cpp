@@ -19,7 +19,8 @@ target_sources(util_header PUBLIC statements.cpp)
 
 target_link_libraries(
   util_header
-  PUBLIC fmt::fmt)
+  PUBLIC fmt::fmt
+         tl::optional)
 
 add_library(frontend)
 configure_target(frontend)
@@ -36,7 +37,7 @@ target_sources(
 target_link_libraries(
   frontend
   PUBLIC lox::util_header tl::expected
-  PRIVATE fmt::fmt)
+  PRIVATE fmt::fmt tl::optional)
 
 add_library(backend)
 configure_target(backend)
@@ -82,6 +83,6 @@ if(NOT ${dart_bin} STREQUAL dart-NOTFOUND)
 
   add_test(
     NAME lox-validation
-    COMMAND ${dart_bin} tool/bin/test.dart chap09_control -i ${lox_BINARY_DIR}/lox/lox
+    COMMAND ${dart_bin} tool/bin/test.dart chap10_functions -i ${lox_BINARY_DIR}/lox/lox
     WORKING_DIRECTORY ${lox_tests_SOURCE_DIR})
 endif()

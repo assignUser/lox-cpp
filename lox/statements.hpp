@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <tl/optional.hpp>
+
 #include "lox/expressions.hpp"
 #include "lox/interpreter.hpp"
 
@@ -27,6 +29,9 @@ public:
   virtual void accept(Visitor &visitor) const = 0;
   [[nodiscard]] StmtKind getKind() const { return m_kind; }
   [[nodiscard]] virtual StmtPtr clone() const = 0;
+  [[nodiscard]] friend StmtPtr clone(StmtPtr const &stmt) {
+    return stmt->clone();
+  }
 
 protected:
   Stmt(Stmt &&) = default;
@@ -129,8 +134,7 @@ public:
     return stmt.getKind() == Stmt::StmtKind::Block;
   }
   [[nodiscard]] StmtPtr clone() const override {
-    auto rng = statements | std::views::transform(&StmtPtr::operator*) |
-               std::views::transform(&Stmt::clone);
+    auto rng = statements | std::views::transform(&Stmt::clone);
 
     return Block::make({rng.begin(), rng.end()});
   }
@@ -144,8 +148,9 @@ private:
 
 class If : public Stmt {
 public:
-  [[nodiscard]] static StmtPtr make(ExprPtr condition, StmtPtr then_stmt,
-                                    StmtPtr else_stmt) {
+  [[nodiscard]] static StmtPtr
+  make(ExprPtr condition, StmtPtr then_stmt,
+       tl::optional<StmtPtr> else_stmt = tl::nullopt) {
     return std::unique_ptr<Stmt>(new If{
         std::move(condition), std::move(then_stmt), std::move(else_stmt)});
   }
@@ -157,15 +162,15 @@ public:
 
   [[nodiscard]] StmtPtr clone() const override {
     return If::make(condition->clone(), then_branch->clone(),
-                    else_branch ? else_branch->clone() : nullptr);
+                    else_branch.map_or(&Stmt::clone, tl::optional<StmtPtr>{}));
   }
 
   ExprPtr condition;
   StmtPtr then_branch;
-  StmtPtr else_branch;
+  tl::optional<StmtPtr> else_branch;
 
 private:
-  explicit If(ExprPtr cond, StmtPtr then_stmt, StmtPtr else_stmt)
+  explicit If(ExprPtr cond, StmtPtr then_stmt, tl::optional<StmtPtr> else_stmt)
       : Stmt(Stmt::StmtKind::If), condition{std::move(cond)},
         then_branch{std::move(then_stmt)}, else_branch{std::move(else_stmt)} {}
 };
@@ -209,8 +214,7 @@ public:
   }
 
   [[nodiscard]] StmtPtr clone() const override {
-    auto rng = body | std::views::transform(&StmtPtr::operator*) |
-               std::views::transform(&Stmt::clone);
+    auto rng = body | std::views::transform(&Stmt::clone);
 
     return FunctionStmt::make(name, {params}, {rng.begin(), rng.end()});
   }

@@ -5,6 +5,8 @@
 
 #include <vector>
 
+#include <tl/optional.hpp>
+
 #include "lox/error.hpp"
 #include "lox/expressions.hpp"
 #include "lox/statements.hpp"
@@ -173,7 +175,7 @@ StmtPtr Parser::ifStatement() {
   consume(Token::Type::RIGHT_PAREN, "Expect ')' after if condition.");
 
   StmtPtr then_branch = statement();
-  StmtPtr else_branch = nullptr;
+  tl::optional<StmtPtr> else_branch = tl::nullopt;
 
   if (match(Token::Type::ELSE)) {
     else_branch = statement();
