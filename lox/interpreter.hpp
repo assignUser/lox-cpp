@@ -64,10 +64,17 @@ public:
     // is correctly restored on error.
   public:
     explicit Context(Interpreter *interp) : Context(interp, tl::nullopt) {}
-    Context(Interpreter *interp, tl::optional<Environment*> parent)
+    Context(Interpreter *interp, tl::optional<Environment *> parent)
         // Following the recursive approach in the book, an iterative approach
         // would make this easier and faster
-        : m_interp{interp}, m_previous(std::move(interp->m_env)) {
+        : m_interp{interp} {
+      if (not m_interp) {
+        throw "Can not create Context with nullptr to Interpreter.";
+      }
+      // This needs to happen after the check as not to leave the Interpreter
+      // with a moved from env.
+      m_previous = std::move(interp->m_env);
+
       if (parent) {
         m_interp->m_env = Environment(*parent);
       } else {
