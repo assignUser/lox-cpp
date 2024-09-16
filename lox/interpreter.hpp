@@ -13,24 +13,6 @@
 #include "lox/expressions.hpp"
 #include "lox/statements.hpp"
 
-class Environment {
-public:
-  Environment() = default;
-  explicit Environment(Environment *encl) : enclosing{encl} {}
-
-  bool contains(std::string const &key) { return m_values.contains(key); }
-  void define(const std::string &name, ExprPtr value) {
-    m_values.insert_or_assign(name, std::move(value));
-  }
-  ExprPtr get(const Token &name);
-  void assign(const Token &name, ExprPtr value);
-
-  tl::optional<Environment *> enclosing{tl::nullopt};
-
-private:
-  std::map<std::string, ExprPtr> m_values{};
-};
-
 class Interpreter : public Visitor {
 public:
   class Context {

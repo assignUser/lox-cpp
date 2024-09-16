@@ -9,6 +9,7 @@
 class Scanner;
 class Parser;
 class Interpreter;
+class Environment;
 
 // Expressions
 class Expr;

@@ -15,34 +15,6 @@
 #include "lox/error.hpp"
 
 
-ExprPtr Environment::get(const Token &name) {
-  if (name.type != Token::Type::IDENTIFIER) {
-    throw RuntimeError(name, "Token not an identifier");
-  }
-
-  if (m_values.contains(name.lexem)) {
-    return m_values.at(name.lexem)->clone();
-  }
-
-  if (enclosing) {
-    return (*enclosing)->get(name);
-  }
-
-  throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
-}
-
-void Environment::assign(const Token &name, ExprPtr value) {
-  if (m_values.contains(name.lexem)) {
-    m_values[name.lexem] = std::move(value);
-    return;
-  } else if (enclosing) {
-    (*enclosing)->assign(name, std::move(value));
-    return;
-  }
-
-  throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
-}
-
 namespace lox_std {
 class Clock : public NativeFunction {
 public:

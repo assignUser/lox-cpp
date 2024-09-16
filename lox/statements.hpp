@@ -5,9 +5,11 @@
 #pragma once
 
 #include <tl/optional.hpp>
+#include <utility>
 
-#include "lox/fwd.hpp"
+#include "lox/env.hpp"
 #include "lox/expressions.hpp"
+#include "lox/fwd.hpp"
 
 class Stmt {
 public:

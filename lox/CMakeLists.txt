@@ -6,21 +6,22 @@ configure_target(util_header)
 target_sources(
   util_header
   PUBLIC FILE_SET
-            HEADERS
-            BASE_DIRS
-            ${PROJECT_SOURCE_DIR}
-            FILES
-            expressions.hpp
-            error.hpp
-            statements.hpp
-            token.hpp)
+         HEADERS
+         BASE_DIRS
+         ${PROJECT_SOURCE_DIR}
+         FILES
+         expressions.hpp
+         error.hpp
+         statements.hpp
+         token.hpp)
 
-target_sources(util_header PUBLIC statements.cpp)
+target_sources(
+  util_header
+  PUBLIC statements.cpp)
 
 target_link_libraries(
   util_header
-  PUBLIC fmt::fmt
-         tl::optional)
+  PUBLIC fmt::fmt tl::optional)
 
 add_library(frontend)
 configure_target(frontend)
@@ -43,12 +44,13 @@ add_library(backend)
 configure_target(backend)
 target_sources(
   backend
-  PRIVATE interpreter.cpp
+  PRIVATE env.cpp interpreter.cpp
   PUBLIC FILE_SET
          HEADERS
          BASE_DIRS
          ${PROJECT_SOURCE_DIR}
          FILES
+         env.hpp
          interpreter.hpp)
 
 target_link_libraries(
