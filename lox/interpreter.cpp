@@ -4,15 +4,16 @@
 
 #include "lox/interpreter.hpp"
 
-#include "lox/expressions.hpp"
-#include "lox/statements.hpp"
-
-#include "fmt/format.h"
 
 #include <chrono>
 #include <fmt/core.h>
 #include <memory>
 #include <vector>
+
+#include "fmt/format.h"
+
+#include "lox/error.hpp"
+
 
 ExprPtr Environment::get(const Token &name) {
   if (name.type != Token::Type::IDENTIFIER) {
@@ -283,9 +284,7 @@ void Interpreter::visit(Assign const &expr) {
   m_env.assign(expr.name, m_result->clone());
 }
 
-void Interpreter::visit(Block const &stmt) {
-  executeBlock(stmt.statements);
-}
+void Interpreter::visit(Block const &stmt) { executeBlock(stmt.statements); }
 
 void Interpreter::executeBlock(std::vector<StmtPtr> const &statements,
                                tl::optional<Environment *> parent_env) {

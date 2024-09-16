@@ -6,8 +6,8 @@
 
 #include <tl/optional.hpp>
 
+#include "lox/fwd.hpp"
 #include "lox/expressions.hpp"
-#include "lox/interpreter.hpp"
 
 class Stmt {
 public:

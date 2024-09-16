@@ -6,6 +6,10 @@
 
 #include <memory>
 
+class Scanner;
+class Parser;
+class Interpreter;
+
 // Expressions
 class Expr;
 class Assign;
