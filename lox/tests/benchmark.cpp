@@ -11,7 +11,15 @@
 
 const static std::string fib_source =
     "fun fib(n) {   if (n <= 1) return n;   return fib(n - 2) + fib(n - 1); }  "
-    "for (var i = 0; i < 20; i = i + 1) {   fib(i); } ";
+    "fib(20);";
+
+int fib(int n) {
+  if (n <= 1) {
+    return n;
+  }
+
+  return fib(n - 2) + fib(n - 1);
+}
 
 TEST_CASE("Benchmark e2e", "[benchmark]") {
   Parser p{Scanner{fib_source}.scanTokens()};
@@ -20,4 +28,5 @@ TEST_CASE("Benchmark e2e", "[benchmark]") {
 
   REQUIRE_FALSE(p.hasError());
   BENCHMARK("fibonacci 20") { return interp.interpret(ast.value()); };
+  BENCHMARK("cpp fibonacci 20") { return fib(20); };
 }
