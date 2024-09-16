@@ -6,19 +6,16 @@
 #include "lox/interpreter.hpp"
 
 ExprPtr Function::call(Interpreter &interpreter,
-                       std::vector<ExprPtr> arguments) const {
-  Environment env = Environment(&interpreter.globals);
+                       std::vector<ExprPtr> arguments)  {
+  auto env = std::make_shared<Environment>(m_closure);
   auto const &decl = stmt_as<FunctionStmt>(*declaration);
 
-  // for recursive functions
-  env.define(decl.name.lexem, this->clone());
-
   for (auto i{0}; i < decl.params.size(); ++i) {
-    env.define(decl.params.at(i).lexem, std::move(arguments.at(i)));
+    env->define(decl.params.at(i).lexem, std::move(arguments.at(i)));
   }
 
   try {
-    interpreter.executeBlock(decl.body, &env);
+    interpreter.executeBlock(decl.body, env);
   } catch (StmtPtr const &return_value) {
     if (isA<Return>(*return_value)) {
       return stmt_as<Return>(*return_value).value->clone();

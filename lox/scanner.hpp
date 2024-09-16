@@ -47,7 +47,7 @@ private:
   void addToken(Token::Type type) { addToken(type, ""); }
   char advance() { return m_source.at(m_current++); }
   bool atEnd() { return m_current >= m_source.length(); }
-  bool isAlpha(char c) { return std::isalpha(static_cast<unsigned char>(c)); }
+  bool isAlpha(char c) { return std::isalpha(static_cast<unsigned char>(c)) || c == '_'; }
   bool isAlphaNumeric(char c) { return isDigit(c) or isAlpha(c); }
   bool isDigit(char c) { return std::isdigit(static_cast<unsigned char>(c)); }
 

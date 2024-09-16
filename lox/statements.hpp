@@ -267,14 +267,16 @@ public:
   virtual ~Callable() = default;
 
   virtual ExprPtr call(Interpreter &interpreter,
-                       std::vector<ExprPtr> arguments) const = 0;
+                       std::vector<ExprPtr> arguments) = 0;
   [[nodiscard]] virtual size_t arity() const noexcept = 0;
 };
 
 class Function : public Expr, public Callable {
 public:
-  [[nodiscard]] static ExprPtr make(StmtPtr declaration) {
-    return std::unique_ptr<Function>(new Function(std::move(declaration)));
+  [[nodiscard]] static ExprPtr make(StmtPtr declaration,
+                                    std::shared_ptr<Environment> closure) {
+    return std::unique_ptr<Function>(
+        new Function(std::move(declaration), std::move(closure)));
   }
   [[nodiscard]] bool isCallable() const override { return true; }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
@@ -291,10 +293,9 @@ public:
                .name.lexem;
   }
   [[nodiscard]] ExprPtr clone() const override {
-    return Function::make(declaration->clone());
+    return Function::make(declaration->clone(), m_closure);
   }
-  ExprPtr call(Interpreter &interpret,
-               std::vector<ExprPtr> arguments) const override;
+  ExprPtr call(Interpreter &interpret, std::vector<ExprPtr> arguments) override;
   [[nodiscard]] size_t arity() const noexcept override {
     return stmt_as<FunctionStmt>(*declaration).params.size();
   }
@@ -303,7 +304,10 @@ public:
   StmtPtr declaration;
 
 private:
-  explicit Function(StmtPtr decl) : Expr(ExprKind::Function), Callable() {
+  std::shared_ptr<Environment> m_closure;
+
+  explicit Function(StmtPtr decl, std::shared_ptr<Environment> closure)
+      : Expr(ExprKind::Function), Callable(), m_closure{std::move(closure)} {
     if (not isA<FunctionStmt>(*decl)) {
       throw std::runtime_error("Function declaration must be FunctionStmt.");
     }

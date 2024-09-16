@@ -8,6 +8,7 @@
 #include <chrono>
 #include <fmt/core.h>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "fmt/format.h"
@@ -25,7 +26,7 @@ public:
   [[nodiscard]] bool equals(Expr const &other) const override { return false; }
   [[nodiscard]] size_t arity() const noexcept override { return 0; };
   ExprPtr call(Interpreter &interpreter,
-               std::vector<ExprPtr> arguments) const override {
+               std::vector<ExprPtr> arguments) override {
     return Number::make(std::chrono::duration_cast<std::chrono::seconds>(
                             std::chrono::steady_clock::now().time_since_epoch())
                             .count());
@@ -38,7 +39,7 @@ private:
 } // namespace lox_std
 
 void Interpreter::importStd() {
-  globals.define("clock", lox_std::Clock::make());
+  globals->define("clock", lox_std::Clock::make());
 }
 
 void Interpreter::evaluate(Expr const *expr) { expr->accept(*this); }
@@ -246,21 +247,21 @@ void Interpreter::visit(Var const &var) {
     value = m_result->clone();
   }
 
-  m_env.define(var.name.lexem, std::move(value));
+  m_env->define(var.name.lexem, std::move(value));
 }
 
-void Interpreter::visit(Variable const &var) { m_result = m_env.get(var.name); }
+void Interpreter::visit(Variable const &var) { m_result = m_env->get(var.name); }
 
 void Interpreter::visit(Assign const &expr) {
   evaluate(expr.value.get());
-  m_env.assign(expr.name, m_result->clone());
+  m_env->assign(expr.name, m_result->clone());
 }
 
-void Interpreter::visit(Block const &stmt) { executeBlock(stmt.statements); }
+void Interpreter::visit(Block const &stmt) { executeBlock(stmt.statements, m_env); }
 
 void Interpreter::executeBlock(std::vector<StmtPtr> const &statements,
-                               tl::optional<Environment *> parent_env) {
-  Context ctx{this, parent_env};
+                               tl::optional<std::shared_ptr<Environment>> parent_env) {
+  Context ctx{this, std::move(parent_env)};
 
   for (auto const &stmt : statements) {
     ctx.execute(stmt.get());
@@ -297,7 +298,7 @@ void Interpreter::visit(Call const &expr) {
     arguments.push_back(std::move(m_result));
   }
 
-  auto const &function = dynamic_cast<Callable &>(*callee);
+  auto &function = dynamic_cast<Callable &>(*callee);
 
   if (arguments.size() != function.arity()) {
     throw RuntimeError{expr.paren,
@@ -310,7 +311,7 @@ void Interpreter::visit(Call const &expr) {
 
 void Interpreter::visit(Function const &expr) { ; }
 void Interpreter::visit(FunctionStmt const &stmt) {
-  m_env.define(stmt.name.lexem, Function::make(stmt.clone()));
+  m_env->define(stmt.name.lexem, Function::make(stmt.clone(), m_env));
 }
 
 void Interpreter::visit(Return const &stmt) {

@@ -119,6 +119,7 @@ StmtPtr Parser::function(std::string const &kind) {
 
     while (match(Token::Type::COMMA)) {
       if (parameters.size() >= 255) {
+        m_hasError = true;
         (void)error(peek(), "Can't have more than 255 parameters.");
       }
 

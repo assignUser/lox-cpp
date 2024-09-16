@@ -13,7 +13,7 @@
 class Environment {
 public:
   Environment() = default;
-  explicit Environment(Environment *encl) : enclosing{encl} {}
+  explicit Environment(std::shared_ptr<Environment> encl) : enclosing{encl} {}
   Environment(Environment const &other);
   Environment &operator=(Environment const &other);
   Environment(Environment &&) = default;
@@ -27,7 +27,7 @@ public:
   [[nodiscard]] ExprPtr get(const Token &name) const;
   void assign(const Token &name, ExprPtr value);
 
-  tl::optional<Environment *> enclosing{tl::nullopt};
+  tl::optional<std::shared_ptr<Environment>> enclosing{tl::nullopt};
 
 private:
   std::map<std::string, ExprPtr> m_values{};

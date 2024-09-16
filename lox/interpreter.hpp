@@ -3,14 +3,15 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #pragma once
 
+#include <memory>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
 #include <tl/optional.hpp>
 
-#include "lox/fwd.hpp"
 #include "lox/expressions.hpp"
+#include "lox/fwd.hpp"
 #include "lox/statements.hpp"
 
 class Interpreter : public Visitor {
@@ -20,7 +21,8 @@ public:
     // is correctly restored on error.
   public:
     explicit Context(Interpreter *interp) : Context(interp, tl::nullopt) {}
-    Context(Interpreter *interp, tl::optional<Environment *> parent)
+    Context(Interpreter *interp,
+            tl::optional<std::shared_ptr<Environment>> parent)
         // Following the recursive approach in the book, an iterative approach
         // would make this easier and faster
         : m_interp{interp} {
@@ -29,18 +31,18 @@ public:
       }
       // This needs to happen after the check as not to leave the Interpreter
       // with a moved from env.
-      m_previous = std::move(interp->m_env);
+      m_previous = interp->m_env;
 
       if (parent) {
-        m_interp->m_env = Environment(parent.take().value());
+        m_interp->m_env = std::make_shared<Environment>(*parent);
       } else {
-        m_interp->m_env = Environment(&m_previous);
+        m_interp->m_env = std::make_shared<Environment>(m_previous);
       }
     }
 
-    Context(const Context &) = default;
+    Context(const Context &) = delete;
     Context(Context &&) = default;
-    Context &operator=(const Context &) = default;
+    Context &operator=(const Context &) = delete;
     Context &operator=(Context &&) = default;
     ~Context() { std::swap(m_interp->m_env, m_previous); }
 
@@ -48,13 +50,13 @@ public:
 
   private:
     Interpreter *m_interp;
-    Environment m_previous;
+    std::shared_ptr<Environment> m_previous;
   };
 
-  Interpreter() : globals{} {
+  Interpreter() : globals{std::make_shared<Environment>()}, m_env(globals) {
     importStd();
-    m_env = Environment{&globals};
   }
+
   ExprPtr interpret(std::vector<StmtPtr> const &statements);
   ExprPtr interpret(Expr const *expr);
   bool hasError() { return m_hasError; }
@@ -63,8 +65,9 @@ public:
     m_tmp.reset();
     m_hasError = false;
   }
-  void executeBlock(std::vector<StmtPtr> const &statements,
-                    tl::optional<Environment *> parent_env = tl::nullopt);
+  void executeBlock(
+      std::vector<StmtPtr> const &statements,
+      tl::optional<std::shared_ptr<Environment>> parent_env = tl::nullopt);
 
   void visit(Binary const &expr) override;
   void visit(Boolean const &expr) override;
@@ -87,7 +90,7 @@ public:
   void visit(Return const &stmt) override;
   void visit(FunctionStmt const &stmt) override;
 
-  Environment globals;
+  std::shared_ptr<Environment> globals{};
 
 private:
   void evaluate(Expr const *expr);
@@ -97,5 +100,5 @@ private:
   ExprPtr m_result;
   ExprPtr m_tmp;
   bool m_hasError{false};
-  Environment m_env{};
+  std::shared_ptr<Environment> m_env{};
 };
