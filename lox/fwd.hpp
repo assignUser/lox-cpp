@@ -30,6 +30,7 @@ class If;
 class Print;
 class Var;
 class While;
+class Return;
 class FunctionStmt;
 using StmtPtr = std::unique_ptr<Stmt>;
 
@@ -62,6 +63,7 @@ public:
   virtual void visit(Block const &stmt) = 0;
   virtual void visit(If const &stmt) = 0;
   virtual void visit(While const &stmt) = 0;
+  virtual void visit(Return const &stmt) = 0;
   virtual void visit(FunctionStmt const &stmt) = 0;
 
 protected:

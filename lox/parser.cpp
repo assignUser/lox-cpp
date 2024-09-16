@@ -148,16 +148,18 @@ StmtPtr Parser::varDeclaration() {
 }
 
 StmtPtr Parser::statement() {
-  if (match(Token::Type::PRINT)) {
-    return printStatement();
-  } else if (match(Token::Type::LEFT_BRACE)) {
-    return Block::make(block());
+  if (match(Token::Type::FOR)) {
+    return forStatement();
   } else if (match(Token::Type::IF)) {
     return ifStatement();
+  } else if (match(Token::Type::PRINT)) {
+    return printStatement();
+  } else if (match(Token::Type::RETURN)) {
+    return returnStatement();
   } else if (match(Token::Type::WHILE)) {
     return whileStatement();
-  } else if (match(Token::Type::FOR)) {
-    return forStatement();
+  } else if (match(Token::Type::LEFT_BRACE)) {
+    return Block::make(block());
   } else {
     return expressionStatement();
   }
@@ -241,6 +243,19 @@ StmtPtr Parser::forStatement() {
   }
 
   return body;
+}
+
+StmtPtr Parser::returnStatement() {
+  Token keyword{previous()};
+  ExprPtr value = Nil::make();
+
+  if (not check(Token::Type::SEMICOLON)) {
+    value = expression();
+  }
+
+  consume(Token::Type::SEMICOLON, "Expect ';' after return value.");
+
+  return Return::make(std::move(keyword), std::move(value));
 }
 
 StmtPtr Parser::expressionStatement() {

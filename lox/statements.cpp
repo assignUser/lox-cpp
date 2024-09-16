@@ -17,7 +17,15 @@ ExprPtr Function::call(Interpreter &interpreter,
     env.define(decl.params.at(i).lexem, std::move(arguments.at(i)));
   }
 
-  interpreter.executeBlock(decl.body, &env);
+  try {
+    interpreter.executeBlock(decl.body, &env);
+  } catch (StmtPtr const &return_value) {
+    if (isA<Return>(*return_value)) {
+      return stmt_as<Return>(*return_value).value->clone();
+    } else {
+      throw "Unexpected statement instead of Return.";
+    }
+  }
 
   return Nil::make();
 }

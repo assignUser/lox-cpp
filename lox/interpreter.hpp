@@ -100,6 +100,7 @@ public:
   void visit(Block const &stmt) override;
   void visit(If const &stmt) override;
   void visit(While const &stmt) override;
+  void visit(Return const &stmt) override;
   void visit(FunctionStmt const &stmt) override;
 
   Environment globals;

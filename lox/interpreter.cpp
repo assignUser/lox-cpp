@@ -283,7 +283,9 @@ void Interpreter::visit(Assign const &expr) {
   m_env.assign(expr.name, m_result->clone());
 }
 
-void Interpreter::visit(Block const &stmt) { executeBlock(stmt.statements); }
+void Interpreter::visit(Block const &stmt) {
+  executeBlock(stmt.statements);
+}
 
 void Interpreter::executeBlock(std::vector<StmtPtr> const &statements,
                                tl::optional<Environment *> parent_env) {
@@ -338,4 +340,13 @@ void Interpreter::visit(Call const &expr) {
 void Interpreter::visit(Function const &expr) { ; }
 void Interpreter::visit(FunctionStmt const &stmt) {
   m_env.define(stmt.name.lexem, Function::make(stmt.clone()));
+}
+
+void Interpreter::visit(Return const &stmt) {
+  evaluate(stmt.value.get());
+
+  ExprPtr value{Nil::make()};
+  std::swap(m_result, value);
+
+  throw Return::make(stmt.keyword, std::move(value));
 }

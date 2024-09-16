@@ -19,6 +19,7 @@ public:
     Print,
     Var,
     While,
+    Return,
   };
 
   explicit Stmt(StmtKind kind) : m_kind(kind) {}
@@ -198,6 +199,30 @@ private:
   explicit While(ExprPtr cond, StmtPtr body)
       : Stmt(Stmt::StmtKind::While), condition{std::move(cond)},
         body{std::move(body)} {}
+};
+
+class Return : public Stmt {
+public:
+  [[nodiscard]] static StmtPtr make(Token keyw, ExprPtr val) {
+    return std::unique_ptr<Stmt>(new Return{std::move(keyw), std::move(val)});
+  }
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  static bool classof(const Stmt &stmt) {
+    return stmt.getKind() == Stmt::StmtKind::Return;
+  }
+
+  [[nodiscard]] StmtPtr clone() const override {
+    return Return::make(keyword, value->clone());
+  }
+
+  Token keyword;
+  ExprPtr value;
+
+private:
+  explicit Return(Token keyw, ExprPtr val)
+      : Stmt(Stmt::StmtKind::Return), keyword{std::move(keyw)},
+        value{std::move(val)} {}
 };
 
 class FunctionStmt : public Stmt {

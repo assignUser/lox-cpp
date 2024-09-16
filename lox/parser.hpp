@@ -42,6 +42,7 @@ private:
   StmtPtr ifStatement();
   StmtPtr whileStatement();
   StmtPtr forStatement();
+  StmtPtr returnStatement();
   std::vector<StmtPtr> block();
   ExprPtr expression();
   ExprPtr assignment();
