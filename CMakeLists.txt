@@ -63,6 +63,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(
   tl_expected
   tl_optional
+  catch2
   fmt
   lyra
   lox_tests)

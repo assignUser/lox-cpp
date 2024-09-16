@@ -86,3 +86,5 @@ if(NOT ${dart_bin} STREQUAL dart-NOTFOUND)
     COMMAND ${dart_bin} tool/bin/test.dart chap10_functions -i ${lox_BINARY_DIR}/lox/lox
     WORKING_DIRECTORY ${lox_tests_SOURCE_DIR})
 endif()
+
+add_subdirectory(tests)
