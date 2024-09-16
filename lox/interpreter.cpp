@@ -14,6 +14,34 @@
 #include <memory>
 #include <vector>
 
+ExprPtr Environment::get(const Token &name) {
+  if (name.type != Token::Type::IDENTIFIER) {
+    throw RuntimeError(name, "Token not an identifier");
+  }
+
+  if (m_values.contains(name.lexem)) {
+    return m_values.at(name.lexem)->clone();
+  }
+
+  if (enclosing) {
+    return (*enclosing)->get(name);
+  }
+
+  throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
+}
+
+void Environment::assign(const Token &name, ExprPtr value) {
+  if (m_values.contains(name.lexem)) {
+    m_values[name.lexem] = std::move(value);
+    return;
+  } else if (enclosing) {
+    (*enclosing)->assign(name, std::move(value));
+    return;
+  }
+
+  throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
+}
+
 namespace lox_std {
 class Clock : public NativeFunction {
 public:
@@ -248,9 +276,7 @@ void Interpreter::visit(Var const &var) {
   m_env.define(var.name.lexem, std::move(value));
 }
 
-void Interpreter::visit(Variable const &var) {
-  m_result = m_env.get(var.name).clone();
-}
+void Interpreter::visit(Variable const &var) { m_result = m_env.get(var.name); }
 
 void Interpreter::visit(Assign const &expr) {
   evaluate(expr.value.get());
@@ -260,7 +286,7 @@ void Interpreter::visit(Assign const &expr) {
 void Interpreter::visit(Block const &stmt) { executeBlock(stmt.statements); }
 
 void Interpreter::executeBlock(std::vector<StmtPtr> const &statements,
-                               Environment *parent_env) {
+                               tl::optional<Environment *> parent_env) {
   Context ctx{this, parent_env};
 
   for (auto const &stmt : statements) {
