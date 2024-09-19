@@ -16,43 +16,6 @@
 
 class Interpreter : public Visitor {
 public:
-  class Context {
-    // RAII alternative to Javas try{}finally to ensure the previous environment
-    // is correctly restored on error.
-  public:
-    explicit Context(Interpreter *interp) : Context(interp, tl::nullopt) {}
-    Context(Interpreter *interp,
-            tl::optional<std::shared_ptr<Environment>> parent)
-        // Following the recursive approach in the book, an iterative approach
-        // would make this easier and faster
-        : m_interp{interp} {
-      if (not m_interp) {
-        throw "Can not create Context with nullptr to Interpreter.";
-      }
-      // This needs to happen after the check as not to leave the Interpreter
-      // with a moved from env.
-      m_previous = interp->m_env;
-
-      if (parent) {
-        m_interp->m_env = std::make_shared<Environment>(*parent);
-      } else {
-        m_interp->m_env = std::make_shared<Environment>(m_previous);
-      }
-    }
-
-    Context(const Context &) = delete;
-    Context(Context &&) = default;
-    Context &operator=(const Context &) = delete;
-    Context &operator=(Context &&) = default;
-    ~Context() { std::swap(m_interp->m_env, m_previous); }
-
-    void execute(Stmt const *stmt) { m_interp->execute(stmt); }
-
-  private:
-    Interpreter *m_interp;
-    std::shared_ptr<Environment> m_previous;
-  };
-
   Interpreter() : globals{std::make_shared<Environment>()}, m_env(globals) {
     importStd();
   }
@@ -101,4 +64,34 @@ private:
   ExprPtr m_tmp;
   bool m_hasError{false};
   std::shared_ptr<Environment> m_env{};
+
+  class Context {
+    // RAII alternative to Javas try{}finally to ensure the previous environment
+    // is correctly restored on error.
+  public:
+    explicit Context(Interpreter &interp) : Context(interp, tl::nullopt) {}
+    Context(Interpreter &interp,
+            tl::optional<std::shared_ptr<Environment>> parent)
+        // Following the recursive approach in the book, an iterative approach
+        // would make this easier and faster
+        : m_interp{interp}, m_previous(interp.m_env) {
+      if (parent) {
+        m_interp.m_env = std::make_shared<Environment>(*parent);
+      } else {
+        m_interp.m_env = std::make_shared<Environment>(m_previous);
+      }
+    }
+
+    Context(const Context &) = delete;
+    Context(Context &&) = default;
+    Context &operator=(const Context &) = delete;
+    Context &operator=(Context &&) = delete;
+    ~Context() { std::swap(m_interp.m_env, m_previous); }
+
+    void execute(Stmt const *stmt) { m_interp.execute(stmt); }
+
+  private:
+    Interpreter &m_interp;
+    std::shared_ptr<Environment> m_previous;
+  };
 };

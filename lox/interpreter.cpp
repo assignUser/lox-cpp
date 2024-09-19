@@ -261,7 +261,7 @@ void Interpreter::visit(Block const &stmt) { executeBlock(stmt.statements, m_env
 
 void Interpreter::executeBlock(std::vector<StmtPtr> const &statements,
                                tl::optional<std::shared_ptr<Environment>> parent_env) {
-  Context ctx{this, std::move(parent_env)};
+  Context ctx{*this, std::move(parent_env)};
 
   for (auto const &stmt : statements) {
     ctx.execute(stmt.get());
