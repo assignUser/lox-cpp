@@ -21,6 +21,7 @@
 #include "lox/interpreter.hpp"
 #include "lox/parser.hpp"
 #include "lox/scanner.hpp"
+#include "lox/resolver.hpp"
 
 using std::operator""sv;
 
@@ -102,9 +103,19 @@ tl::expected<int, Error> run(std::string_view source) {
     // Don't run interpreter on input with parser error.
     return 65;
   }
-
+  
   static Interpreter interpreter{};
+
+  Resolver resolver{interpreter};
+  resolver.resolve(statements.value());
+
+  if (resolver.had_error){
+    // Don't run interpreter on input with resovler error.
+    return 65;
+  }
+  
   interpreter.interpret(statements.value());
+
   if (interpreter.hasError()) {
     return 70;
   }

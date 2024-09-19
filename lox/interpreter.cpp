@@ -4,7 +4,6 @@
 
 #include "lox/interpreter.hpp"
 
-
 #include <chrono>
 #include <fmt/core.h>
 #include <memory>
@@ -14,7 +13,6 @@
 #include "fmt/format.h"
 
 #include "lox/error.hpp"
-
 
 namespace lox_std {
 class Clock : public NativeFunction {
@@ -250,17 +248,32 @@ void Interpreter::visit(Var const &var) {
   m_env->define(var.name.lexem, std::move(value));
 }
 
-void Interpreter::visit(Variable const &var) { m_result = m_env->get(var.name); }
+void Interpreter::visit(Variable const &var) { lookUpVariable(var.name, &var); }
+void Interpreter::lookUpVariable(Token const &name, Expr const *const expr) {
+  fmt::println("ptr for {} in lookup: {}", name.lexem, fmt::ptr(expr));
+  if (m_locals.contains(expr)) {
+    m_result = m_env->getAt(name, m_locals[expr]);
+  } else {
+    m_result = globals->get(name);
+  }
+}
 
 void Interpreter::visit(Assign const &expr) {
   evaluate(expr.value.get());
-  m_env->assign(expr.name, m_result->clone());
+  if (m_locals.contains(&expr)) {
+    m_env->assignAt(expr.name, m_result->clone(), m_locals[&expr]);
+  } else {
+    globals->assign(expr.name, m_result->clone());
+  }
 }
 
-void Interpreter::visit(Block const &stmt) { executeBlock(stmt.statements, m_env); }
+void Interpreter::visit(Block const &stmt) {
+  executeBlock(stmt.statements, m_env);
+}
 
-void Interpreter::executeBlock(std::vector<StmtPtr> const &statements,
-                               tl::optional<std::shared_ptr<Environment>> parent_env) {
+void Interpreter::executeBlock(
+    std::vector<StmtPtr> const &statements,
+    tl::optional<std::shared_ptr<Environment>> parent_env) {
   Context ctx{*this, std::move(parent_env)};
 
   for (auto const &stmt : statements) {
@@ -315,6 +328,7 @@ void Interpreter::visit(FunctionStmt const &stmt) {
 }
 
 void Interpreter::visit(Return const &stmt) {
+  fmt::println("ptr for variable in return: {}", fmt::ptr(stmt.value.get()));
   evaluate(stmt.value.get());
 
   ExprPtr value{Nil::make()};

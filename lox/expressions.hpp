@@ -287,7 +287,10 @@ public:
 
     return std::unique_ptr<Expr>(new Variable{std::move(name)});
   }
-  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  void accept(Visitor &visitor) const override { 
+  fmt::println("ptr for {} in accept: {}", name.lexem, fmt::ptr(this));
+
+    visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
     if (not isA<Variable>(other)) {
       return false;

@@ -44,13 +44,14 @@ add_library(backend)
 configure_target(backend)
 target_sources(
   backend
-  PRIVATE env.cpp interpreter.cpp
+  PRIVATE env.cpp resolver.cpp interpreter.cpp
   PUBLIC FILE_SET
          HEADERS
          BASE_DIRS
          ${PROJECT_SOURCE_DIR}
          FILES
          env.hpp
+         resolver.hpp
          interpreter.hpp)
 
 target_link_libraries(

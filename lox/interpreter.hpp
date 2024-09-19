@@ -22,6 +22,9 @@ public:
 
   ExprPtr interpret(std::vector<StmtPtr> const &statements);
   ExprPtr interpret(Expr const *expr);
+  void resolve(Expr const *const expr, size_t depth) {
+    m_locals.insert_or_assign(expr, depth);
+  }
   bool hasError() { return m_hasError; }
   void clear() {
     m_result.reset();
@@ -58,12 +61,14 @@ public:
 private:
   void evaluate(Expr const *expr);
   void execute(Stmt const *stmt);
+  void lookUpVariable(Token const &name, Expr const *const expr);
   void importStd();
 
   ExprPtr m_result;
   ExprPtr m_tmp;
   bool m_hasError{false};
   std::shared_ptr<Environment> m_env{};
+  std::map<Expr const *const, size_t> m_locals{};
 
   class Context {
     // RAII alternative to Javas try{}finally to ensure the previous environment

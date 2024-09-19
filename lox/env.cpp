@@ -38,6 +38,27 @@ Environment &Environment::operator=(Environment const &other) {
 
   throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
 }
+[[nodiscard]] ExprPtr Environment::getAt(const Token &name,
+                                         size_t distance) const {
+  return ancestor(distance).m_values.at(name.lexem)->clone();
+}
+
+[[nodiscard]] Environment const &Environment::ancestor(size_t distance) const {
+  Environment const *maybe_env = this;
+  for (auto d : std::views::iota(size_t{0}, distance)) {
+    if (maybe_env->enclosing) {
+      maybe_env = maybe_env->enclosing->get();
+    } else {
+      throw "Expected enclosing env not found.";
+    }
+  }
+  return *maybe_env;
+}
+
+[[nodiscard]] Environment &Environment::ancestor(size_t distance) {
+  return const_cast<Environment &>(
+      const_cast<Environment const *>(this)->ancestor(distance));
+}
 
 void Environment::assign(const Token &name, ExprPtr value) {
   if (m_values.contains(name.lexem)) {
@@ -49,4 +70,10 @@ void Environment::assign(const Token &name, ExprPtr value) {
   }
 
   throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
+}
+
+void Environment::assignAt(Token const &name, ExprPtr value, size_t distance) {
+  // this is a different api to assign as there is no check if the var is
+  // defined, I guess because the resolver guarantees that it's defined?
+  ancestor(distance).define(name.lexem, std::move(value));
 }

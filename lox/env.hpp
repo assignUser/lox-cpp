@@ -25,7 +25,11 @@ public:
     m_values.insert_or_assign(name, std::move(value));
   }
   [[nodiscard]] ExprPtr get(const Token &name) const;
+  [[nodiscard]] ExprPtr getAt(const Token &name, size_t distance) const;
+  [[nodiscard]] Environment const &ancestor(size_t distance) const;
+  [[nodiscard]] Environment &ancestor(size_t distance);
   void assign(const Token &name, ExprPtr value);
+  void assignAt(Token const &name, ExprPtr value, size_t distance);
 
   tl::optional<std::shared_ptr<Environment>> enclosing{tl::nullopt};
 
