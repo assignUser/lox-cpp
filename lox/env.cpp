@@ -11,7 +11,7 @@
 Environment::Environment(Environment const &other)
     : enclosing{other.enclosing} {
   for (auto const &[key, value] : other.m_values) {
-    m_values.insert({key, value->clone()});
+    m_values.insert({key, value});
   }
 }
 
@@ -29,7 +29,7 @@ Environment &Environment::operator=(Environment const &other) {
   }
 
   if (m_values.contains(name.lexem)) {
-    return m_values.at(name.lexem)->clone();
+    return m_values.at(name.lexem);
   }
 
   if (enclosing) {
@@ -40,12 +40,12 @@ Environment &Environment::operator=(Environment const &other) {
 }
 [[nodiscard]] ExprPtr Environment::getAt(const Token &name,
                                          size_t distance) const {
-  return ancestor(distance).m_values.at(name.lexem)->clone();
+  return ancestor(distance).m_values.at(name.lexem);
 }
 
 [[nodiscard]] Environment const &Environment::ancestor(size_t distance) const {
   Environment const *maybe_env = this;
-  for (auto d : std::views::iota(size_t{0}, distance)) {
+  for (auto i =0; i < distance; ++i) {
     if (maybe_env->enclosing) {
       maybe_env = maybe_env->enclosing->get();
     } else {

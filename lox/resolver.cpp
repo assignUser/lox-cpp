@@ -30,11 +30,12 @@ void Resolver::resolveLocal(Expr const *const expr, Token const &name) {
     size_t depth = std::distance(m_scopes.rbegin(), scope);
 
     if (scope->contains(name.lexem)) {
-      fmt::println("ptr for {} in resolver: {}", name.lexem, fmt::ptr(expr));
       m_interp.resolve(expr, depth);
       return;
     }
   }
+
+  // throw Error{name.line,"", "Variable not found in any scope."};
 
   // for (auto i = m_scopes.size() - 1; i >= 0; --i) {
   //   if (m_scopes.at(i).contains(name.lexem)) {
@@ -45,11 +46,13 @@ void Resolver::resolveLocal(Expr const *const expr, Token const &name) {
 
 void Resolver::resolveFunction(FunctionStmt const &function) {
   beginScope();
+  beginScope();
   for (Token const &param : function.params) {
     declare(param);
     define(param);
   }
   resolve(function.body);
+  endScope();
   endScope();
 }
 

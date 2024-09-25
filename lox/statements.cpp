@@ -18,7 +18,7 @@ ExprPtr Function::call(Interpreter &interpreter,
     interpreter.executeBlock(decl.body, env);
   } catch (StmtPtr const &return_value) {
     if (isA<Return>(*return_value)) {
-      return stmt_as<Return>(*return_value).value->clone();
+      return stmt_as<Return>(*return_value).value;
     } else {
       throw "Unexpected statement instead of Return.";
     }

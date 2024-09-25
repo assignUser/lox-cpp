@@ -22,7 +22,7 @@ public:
 
   bool contains(std::string const &key) { return m_values.contains(key); }
   void define(const std::string &name, ExprPtr value) {
-    m_values.insert_or_assign(name, std::move(value));
+    m_values.insert_or_assign(name, value);
   }
   [[nodiscard]] ExprPtr get(const Token &name) const;
   [[nodiscard]] ExprPtr getAt(const Token &name, size_t distance) const;

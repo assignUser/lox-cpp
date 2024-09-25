@@ -378,7 +378,7 @@ ExprPtr Parser::unary() {
   if (match(Token::Type::BANG, Token::Type::MINUS)) {
     Token const &op = previous();
     ExprPtr rhs = unary();
-    return Unary::make(op, std::move(rhs));
+    return Unary::make(op, rhs);
   }
   return call();
 }

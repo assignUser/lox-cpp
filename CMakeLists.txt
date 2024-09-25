@@ -13,7 +13,8 @@ function(configure_target target)
                CXX_STANDARD_REQUIRED ON)
 
   get_target_property(target_type ${target} TYPE)
-
+  # target_compile_options(${target} PUBLIC -fsanitize=undefined -fsanitize=address )
+  # target_link_options(${target} PUBLIC -fsanitize=undefined -fsanitize=address )
   if(NOT target_type STREQUAL "EXECUTABLE")
     add_library(lox::${target} ALIAS ${target})
   endif()
@@ -57,8 +58,7 @@ list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
 FetchContent_Declare(
   lox_tests
   GIT_REPOSITORY https://github.com/assignUser/craftinginterpreters
-  GIT_TAG improved-runtime-errors
-)
+  GIT_TAG improved-runtime-errors)
 
 FetchContent_MakeAvailable(
   tl_expected

@@ -40,7 +40,6 @@ public:
   virtual ~Expr() = default;
   virtual void accept(Visitor &visitor) const = 0;
 
-  [[nodiscard]] virtual ExprPtr clone() const = 0;
   [[nodiscard]] virtual bool equals(Expr const &other) const = 0;
   [[nodiscard]] ExprKind getKind() const { return m_kind; }
   [[nodiscard]] virtual bool truthy() const { return true; }
@@ -96,9 +95,8 @@ template <typename AsType> AsType const &stmt_as(const Stmt &stmt) {
 
 class Binary : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr>
-  make(std::unique_ptr<Expr> lhs, Token op, std::unique_ptr<Expr> rhs) {
-    return std::unique_ptr<Expr>(
+  [[nodiscard]] static ExprPtr make(ExprPtr lhs, Token op, ExprPtr rhs) {
+    return std::shared_ptr<Expr>(
         new Binary{std::move(lhs), std::move(op), std::move(rhs)});
   }
 
@@ -115,24 +113,21 @@ public:
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Binary;
   }
-  [[nodiscard]] ExprPtr clone() const override {
-    return Binary::make(lhs->clone(), op, rhs->clone());
-  }
 
-  std::unique_ptr<Expr> lhs;
-  std::unique_ptr<Expr> rhs;
+  ExprPtr lhs;
+  ExprPtr rhs;
   Token op;
 
 private:
-  Binary(std::unique_ptr<Expr> lhs, Token op, std::unique_ptr<Expr> rhs)
+  Binary(ExprPtr lhs, Token op, ExprPtr rhs)
       : Expr(ExprKind::Binary), lhs{std::move(lhs)}, op{std::move(op)},
         rhs{std::move(rhs)} {}
 };
 
 class Grouping : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(std::unique_ptr<Expr> expr) {
-    return std::unique_ptr<Expr>(new Grouping{std::move(expr)});
+  [[nodiscard]] static ExprPtr make(ExprPtr expr) {
+    return std::shared_ptr<Expr>(new Grouping{std::move(expr)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -145,21 +140,18 @@ public:
     return expr.getKind() == Expr::ExprKind::Grouping;
   }
   [[nodiscard]] bool truthy() const override { return expr->truthy(); }
-  [[nodiscard]] ExprPtr clone() const override {
-    return Grouping::make(expr->clone());
-  }
 
-  std::unique_ptr<Expr> expr;
+  ExprPtr expr;
 
 private:
-  explicit Grouping(std::unique_ptr<Expr> expr)
+  explicit Grouping(ExprPtr expr)
       : Expr(ExprKind::Grouping), expr{std::move(expr)} {}
 };
 
 class String : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(std::string value) {
-    return std::unique_ptr<Expr>(new String{std::move(value)});
+  [[nodiscard]] static ExprPtr make(std::string value) {
+    return std::shared_ptr<Expr>(new String{std::move(value)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -171,7 +163,6 @@ public:
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::String;
   }
-  [[nodiscard]] ExprPtr clone() const override { return String::make(value); }
 
   std::string value;
 
@@ -182,8 +173,8 @@ private:
 
 class Number : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(double value) {
-    return std::unique_ptr<Expr>(new Number{value});
+  [[nodiscard]] static ExprPtr make(double value) {
+    return std::shared_ptr<Expr>(new Number{value});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -195,7 +186,7 @@ public:
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Number;
   }
-  [[nodiscard]] ExprPtr clone() const override { return Number::make(value); }
+
   double value;
 
 private:
@@ -204,8 +195,8 @@ private:
 
 class Boolean : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(bool value) {
-    return std::unique_ptr<Expr>(new Boolean{value});
+  [[nodiscard]] static ExprPtr make(bool value) {
+    return std::shared_ptr<Expr>(new Boolean{value});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -218,7 +209,6 @@ public:
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Boolean;
   }
-  [[nodiscard]] ExprPtr clone() const override { return Boolean::make(value); }
 
   bool value;
 
@@ -228,8 +218,8 @@ private:
 
 class Nil : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make() {
-    return std::unique_ptr<Expr>(new Nil{});
+  [[nodiscard]] static ExprPtr make() {
+    return std::shared_ptr<Expr>(new Nil{});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
 
@@ -243,7 +233,6 @@ public:
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Nil;
   }
-  [[nodiscard]] ExprPtr clone() const override { return Nil::make(); }
 
 private:
   explicit Nil() : Expr(ExprKind::Nil){};
@@ -251,9 +240,8 @@ private:
 
 class Unary : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(Token op,
-                                                  std::unique_ptr<Expr> expr) {
-    return std::unique_ptr<Expr>(new Unary{std::move(op), std::move(expr)});
+  [[nodiscard]] static ExprPtr make(Token op, ExprPtr expr) {
+    return ExprPtr(new Unary{std::move(op), std::move(expr)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -266,31 +254,24 @@ public:
     return expr.getKind() == Expr::ExprKind::Unary;
   }
 
-  [[nodiscard]] ExprPtr clone() const override {
-    return Unary::make(op, expr->clone());
-  }
-
   Token op;
-  std::unique_ptr<Expr> expr;
+  ExprPtr expr;
 
 private:
-  Unary(Token op, std::unique_ptr<Expr> expr)
+  Unary(Token op, ExprPtr expr)
       : Expr(ExprKind::Unary), op{std::move(op)}, expr{std::move(expr)} {}
 };
 
 class Variable : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(Token name) {
+  [[nodiscard]] static ExprPtr make(Token name) {
     if (name.type != Token::Type::IDENTIFIER) {
       throw "Tried to create Variable with non IDENTIFIER token.";
     }
 
-    return std::unique_ptr<Expr>(new Variable{std::move(name)});
+    return std::shared_ptr<Expr>(new Variable{std::move(name)});
   }
-  void accept(Visitor &visitor) const override { 
-  fmt::println("ptr for {} in accept: {}", name.lexem, fmt::ptr(this));
-
-    visitor.visit(*this); }
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
     if (not isA<Variable>(other)) {
       return false;
@@ -300,7 +281,6 @@ public:
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Variable;
   }
-  [[nodiscard]] ExprPtr clone() const override { return Variable::make(name); }
 
   Token name;
 
@@ -311,12 +291,12 @@ private:
 
 class Assign : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(Token name, ExprPtr value) {
+  [[nodiscard]] static ExprPtr make(Token name, ExprPtr value) {
     if (name.type != Token::Type::IDENTIFIER) {
       throw "Tried to create Assign with non IDENTIFIER token.";
     }
 
-    return std::unique_ptr<Expr>(new Assign{std::move(name), std::move(value)});
+    return std::shared_ptr<Expr>(new Assign{std::move(name), std::move(value)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -328,9 +308,6 @@ public:
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Assign;
-  }
-  [[nodiscard]] ExprPtr clone() const override {
-    return Assign::make(name, value->clone());
   }
 
   Token name;
@@ -344,9 +321,9 @@ private:
 
 class Call : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr>
-  make(ExprPtr callee, Token paren, std::vector<ExprPtr> arguments) {
-    return std::unique_ptr<Expr>(
+  [[nodiscard]] static ExprPtr make(ExprPtr callee, Token paren,
+                                    std::vector<ExprPtr> arguments) {
+    return std::shared_ptr<Expr>(
         new Call{std::move(callee), std::move(paren), std::move(arguments)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
@@ -364,11 +341,6 @@ public:
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Call;
-  }
-  [[nodiscard]] ExprPtr clone() const override {
-    auto rng = arguments | std::views::transform(&ExprPtr::operator*) |
-               std::views::transform(&Expr::clone);
-    return Call::make(callee->clone(), paren, {rng.begin(), rng.end()});
   }
 
   ExprPtr callee;

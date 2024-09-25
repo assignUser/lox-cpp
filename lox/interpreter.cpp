@@ -20,7 +20,6 @@ public:
   [[nodiscard]] static ExprPtr make() {
     return std::unique_ptr<Clock>(new Clock());
   }
-  [[nodiscard]] ExprPtr clone() const override { return Clock::make(); }
   [[nodiscard]] bool equals(Expr const &other) const override { return false; }
   [[nodiscard]] size_t arity() const noexcept override { return 0; };
   ExprPtr call(Interpreter &interpreter,
@@ -54,7 +53,7 @@ ExprPtr Interpreter::interpret(std::vector<StmtPtr> const &statements) {
     m_result = Nil::make();
   }
 
-  ExprPtr res = std::move(m_result);
+  ExprPtr res = m_result;
   m_result.reset();
   return res;
 }
@@ -68,7 +67,7 @@ ExprPtr Interpreter::interpret(Expr const *expr) {
     m_result = Nil::make();
   }
 
-  ExprPtr res = std::move(m_result);
+  ExprPtr res = m_result;
   m_result.reset();
   return res;
 }
@@ -86,7 +85,7 @@ void Interpreter::visit(Binary const &expr) {
     return;
   }
   // post-pone move until after short-circuit evaluation
-  ExprPtr lhs{std::move(m_result)};
+  ExprPtr lhs{m_result};
 
   evaluate(expr.rhs.get());
 
@@ -105,7 +104,7 @@ void Interpreter::visit(Binary const &expr) {
     break;
   }
 
-  ExprPtr rhs{std::move(m_result)};
+  ExprPtr rhs{m_result};
 
   if (isA<Number>(*lhs) and isA<Number>(*rhs)) {
     switch (expr.op.type) {
@@ -190,7 +189,7 @@ void Interpreter::visit(String const &expr) {
 void Interpreter::visit(Unary const &expr) {
   evaluate(expr.expr.get());
   // properly not needed here
-  ExprPtr rhs{std::move(m_result)};
+  ExprPtr rhs{m_result};
 
   if (expr.op.type == Token::Type::MINUS) {
     if (isA<Number>(*rhs)) {
@@ -242,15 +241,14 @@ void Interpreter::visit(Var const &var) {
   ExprPtr value = Nil::make();
   if (var.initializer->getKind() != Expr::ExprKind::Nil) {
     evaluate(var.initializer.get());
-    value = m_result->clone();
+    value = m_result;
   }
 
-  m_env->define(var.name.lexem, std::move(value));
+  m_env->define(var.name.lexem, value);
 }
 
 void Interpreter::visit(Variable const &var) { lookUpVariable(var.name, &var); }
 void Interpreter::lookUpVariable(Token const &name, Expr const *const expr) {
-  fmt::println("ptr for {} in lookup: {}", name.lexem, fmt::ptr(expr));
   if (m_locals.contains(expr)) {
     m_result = m_env->getAt(name, m_locals[expr]);
   } else {
@@ -261,9 +259,9 @@ void Interpreter::lookUpVariable(Token const &name, Expr const *const expr) {
 void Interpreter::visit(Assign const &expr) {
   evaluate(expr.value.get());
   if (m_locals.contains(&expr)) {
-    m_env->assignAt(expr.name, m_result->clone(), m_locals[&expr]);
+    m_env->assignAt(expr.name, m_result, m_locals[&expr]);
   } else {
-    globals->assign(expr.name, m_result->clone());
+    globals->assign(expr.name, m_result);
   }
 }
 
@@ -300,7 +298,7 @@ void Interpreter::visit(While const &stmt) {
 
 void Interpreter::visit(Call const &expr) {
   evaluate(expr.callee.get());
-  ExprPtr callee = std::move(m_result);
+  ExprPtr callee = m_result;
   if (not callee->isCallable()) {
     throw RuntimeError{expr.paren, "Can only call functions and classes."};
   }
@@ -308,7 +306,7 @@ void Interpreter::visit(Call const &expr) {
   std::vector<ExprPtr> arguments;
   for (ExprPtr const &argument : expr.arguments) {
     evaluate(argument.get());
-    arguments.push_back(std::move(m_result));
+    arguments.push_back(m_result);
   }
 
   auto &function = dynamic_cast<Callable &>(*callee);
@@ -328,11 +326,10 @@ void Interpreter::visit(FunctionStmt const &stmt) {
 }
 
 void Interpreter::visit(Return const &stmt) {
-  fmt::println("ptr for variable in return: {}", fmt::ptr(stmt.value.get()));
   evaluate(stmt.value.get());
 
   ExprPtr value{Nil::make()};
   std::swap(m_result, value);
 
-  throw Return::make(stmt.keyword, std::move(value));
+  throw Return::make(stmt.keyword, value);
 }

@@ -63,7 +63,7 @@ struct fmt::formatter<Stmt::StmtKind> : fmt::formatter<std::string_view> {
 
 class Expression : public Stmt {
 public:
-  [[nodiscard]] static StmtPtr make(std::unique_ptr<Expr> expr) {
+  [[nodiscard]] static StmtPtr make(ExprPtr expr) {
     return std::unique_ptr<Stmt>(new Expression{std::move(expr)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
@@ -72,7 +72,7 @@ public:
   }
 
   [[nodiscard]] StmtPtr clone() const override {
-    return Expression::make(expr->clone());
+    return Expression::make(expr);
   }
 
   ExprPtr expr;
@@ -91,9 +91,7 @@ public:
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Print;
   }
-  [[nodiscard]] StmtPtr clone() const override {
-    return Print::make(expr->clone());
-  }
+  [[nodiscard]] StmtPtr clone() const override { return Print::make(expr); }
 
   ExprPtr expr;
 
@@ -104,8 +102,7 @@ private:
 
 class Var : public Stmt {
 public:
-  [[nodiscard]] static StmtPtr make(Token name,
-                                    std::unique_ptr<Expr> initializer) {
+  [[nodiscard]] static StmtPtr make(Token name, ExprPtr initializer) {
     return std::unique_ptr<Stmt>(
         new Var{std::move(name), std::move(initializer)});
   }
@@ -114,7 +111,7 @@ public:
     return stmt.getKind() == Stmt::StmtKind::Var;
   }
   [[nodiscard]] StmtPtr clone() const override {
-    return Var::make(name, initializer->clone());
+    return Var::make(name, initializer);
   }
 
   Token name;
@@ -164,7 +161,7 @@ public:
   }
 
   [[nodiscard]] StmtPtr clone() const override {
-    return If::make(condition->clone(), then_branch->clone(),
+    return If::make(condition, then_branch->clone(),
                     else_branch.map_or(&Stmt::clone, tl::optional<StmtPtr>{}));
   }
 
@@ -191,7 +188,7 @@ public:
   }
 
   [[nodiscard]] StmtPtr clone() const override {
-    return While::make(condition->clone(), body->clone());
+    return While::make(condition, body->clone());
   }
 
   ExprPtr condition;
@@ -215,7 +212,7 @@ public:
   }
 
   [[nodiscard]] StmtPtr clone() const override {
-    return Return::make(keyword, value->clone());
+    return Return::make(keyword, value);
   }
 
   Token keyword;
@@ -291,9 +288,6 @@ public:
     return stmt_as<FunctionStmt>(*declaration).name.lexem ==
            stmt_as<FunctionStmt>(*expr_as<Function>(other).declaration)
                .name.lexem;
-  }
-  [[nodiscard]] ExprPtr clone() const override {
-    return Function::make(declaration->clone(), m_closure);
   }
   ExprPtr call(Interpreter &interpret, std::vector<ExprPtr> arguments) override;
   [[nodiscard]] size_t arity() const noexcept override {

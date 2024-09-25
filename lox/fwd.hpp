@@ -25,7 +25,7 @@ class Unary;
 class Variable;
 class Function;
 class NativeFunction;
-using ExprPtr = std::unique_ptr<Expr>;
+using ExprPtr = std::shared_ptr<Expr>;
 
 // Statements
 class Stmt;
@@ -37,7 +37,7 @@ class Var;
 class While;
 class Return;
 class FunctionStmt;
-using StmtPtr = std::unique_ptr<Stmt>;
+using StmtPtr = std::shared_ptr<Stmt>;
 
 
 struct Token;
