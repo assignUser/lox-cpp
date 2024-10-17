@@ -24,28 +24,31 @@ Environment &Environment::operator=(Environment const &other) {
 }
 
 [[nodiscard]] ExprPtr Environment::get(const Token &name) const {
+  return getAt(name, 0, true);
+}
+
+[[nodiscard]] ExprPtr Environment::getAt(const Token &name, size_t distance,
+                                         bool search_enclosing) const {
+  Environment const &env = ancestor(distance);
+
   if (name.type != Token::Type::IDENTIFIER) {
     throw RuntimeError(name, "Token not an identifier");
   }
 
-  if (m_values.contains(name.lexem)) {
-    return m_values.at(name.lexem);
+  if (env.m_values.contains(name.lexem)) {
+    return env.m_values.at(name.lexem);
   }
 
-  if (enclosing) {
+  if (search_enclosing and enclosing) {
     return (*enclosing)->get(name);
   }
 
   throw RuntimeError(name, fmt::format("Undefined variable '{}'.", name.lexem));
 }
-[[nodiscard]] ExprPtr Environment::getAt(const Token &name,
-                                         size_t distance) const {
-  return ancestor(distance).m_values.at(name.lexem);
-}
 
 [[nodiscard]] Environment const &Environment::ancestor(size_t distance) const {
   Environment const *maybe_env = this;
-  for (auto i =0; i < distance; ++i) {
+  for (auto i = 0; i < distance; ++i) {
     if (maybe_env->enclosing) {
       maybe_env = maybe_env->enclosing->get();
     } else {

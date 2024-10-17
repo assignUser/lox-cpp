@@ -25,7 +25,7 @@ public:
     m_values.insert_or_assign(name, value);
   }
   [[nodiscard]] ExprPtr get(const Token &name) const;
-  [[nodiscard]] ExprPtr getAt(const Token &name, size_t distance) const;
+  [[nodiscard]] ExprPtr getAt(const Token &name, size_t distance, bool search_enclosing = false) const;
   [[nodiscard]] Environment const &ancestor(size_t distance) const;
   [[nodiscard]] Environment &ancestor(size_t distance);
   void assign(const Token &name, ExprPtr value);
