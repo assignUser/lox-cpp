@@ -25,16 +25,12 @@ public:
   };
 
   explicit Stmt(StmtKind kind) : m_kind(kind) {}
-  Stmt &operator=(const Stmt &) = delete;
-  Stmt(const Stmt &) = delete;
+  Stmt &operator=(Stmt const &) = default;
+  Stmt(Stmt const &) = default;
 
   virtual ~Stmt() = default;
   virtual void accept(Visitor &visitor) const = 0;
   [[nodiscard]] StmtKind getKind() const { return m_kind; }
-  [[nodiscard]] virtual StmtPtr clone() const = 0;
-  [[nodiscard]] friend StmtPtr clone(StmtPtr const &stmt) {
-    return stmt->clone();
-  }
 
 protected:
   Stmt(Stmt &&) = default;
@@ -71,10 +67,6 @@ public:
     return stmt.getKind() == Stmt::StmtKind::Expression;
   }
 
-  [[nodiscard]] StmtPtr clone() const override {
-    return Expression::make(expr);
-  }
-
   ExprPtr expr;
 
 private:
@@ -91,7 +83,6 @@ public:
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Print;
   }
-  [[nodiscard]] StmtPtr clone() const override { return Print::make(expr); }
 
   ExprPtr expr;
 
@@ -109,9 +100,6 @@ public:
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Var;
-  }
-  [[nodiscard]] StmtPtr clone() const override {
-    return Var::make(name, initializer);
   }
 
   Token name;
@@ -133,11 +121,6 @@ public:
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Block;
   }
-  [[nodiscard]] StmtPtr clone() const override {
-    auto rng = statements | std::views::transform(&Stmt::clone);
-
-    return Block::make({rng.begin(), rng.end()});
-  }
 
   std::vector<StmtPtr> statements;
 
@@ -158,11 +141,6 @@ public:
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::If;
-  }
-
-  [[nodiscard]] StmtPtr clone() const override {
-    return If::make(condition, then_branch->clone(),
-                    else_branch.map_or(&Stmt::clone, tl::optional<StmtPtr>{}));
   }
 
   ExprPtr condition;
@@ -187,10 +165,6 @@ public:
     return stmt.getKind() == Stmt::StmtKind::While;
   }
 
-  [[nodiscard]] StmtPtr clone() const override {
-    return While::make(condition, body->clone());
-  }
-
   ExprPtr condition;
   StmtPtr body;
 
@@ -209,10 +183,6 @@ public:
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::Return;
-  }
-
-  [[nodiscard]] StmtPtr clone() const override {
-    return Return::make(keyword, value);
   }
 
   Token keyword;
@@ -235,12 +205,6 @@ public:
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
     return stmt.getKind() == Stmt::StmtKind::FunctionStmt;
-  }
-
-  [[nodiscard]] StmtPtr clone() const override {
-    auto rng = body | std::views::transform(&Stmt::clone);
-
-    return FunctionStmt::make(name, {params}, {rng.begin(), rng.end()});
   }
 
   Token name;
