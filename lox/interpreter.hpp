@@ -80,11 +80,8 @@ private:
         // Following the recursive approach in the book, an iterative approach
         // would make this easier and faster
         : m_interp{interp}, m_previous(interp.m_env) {
-      if (parent) {
-        m_interp.m_env = std::make_shared<Environment>(*parent);
-      } else {
-        m_interp.m_env = std::make_shared<Environment>(m_previous);
-      }
+      m_interp.m_env =
+          parent.value_or(std::make_shared<Environment>(m_previous));
     }
 
     Context(const Context &) = delete;

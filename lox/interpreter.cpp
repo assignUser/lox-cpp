@@ -266,7 +266,7 @@ void Interpreter::visit(Assign const &expr) {
 }
 
 void Interpreter::visit(Block const &stmt) {
-  executeBlock(stmt.statements, m_env);
+  executeBlock(stmt.statements, tl::nullopt);
 }
 
 void Interpreter::executeBlock(
@@ -322,7 +322,7 @@ void Interpreter::visit(Call const &expr) {
 
 void Interpreter::visit(Function const &expr) { ; }
 void Interpreter::visit(FunctionStmt const &stmt) {
-  m_env->define(stmt.name.lexem, Function::make(stmt.clone(), m_env));
+  m_env->define(stmt.name.lexem, Function::make(std::make_shared<FunctionStmt>(stmt), m_env));
 }
 
 void Interpreter::visit(Return const &stmt) {
