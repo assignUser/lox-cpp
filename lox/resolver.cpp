@@ -22,10 +22,6 @@ void Resolver::resolve(std::vector<StmtPtr> const &statements) {
 }
 
 void Resolver::resolveLocal(Expr const *const expr, Token const &name) {
-  // using std::ranges::views::iota;
-  // using std::ranges::views::reverse;
-  // for (auto i : iota(size_t{0}, m_scopes.size()) | reverse) {
-  // }
   for (auto scope = m_scopes.rbegin(); scope != m_scopes.rend(); ++scope) {
     size_t depth = std::distance(m_scopes.rbegin(), scope);
 
@@ -34,25 +30,15 @@ void Resolver::resolveLocal(Expr const *const expr, Token const &name) {
       return;
     }
   }
-
-  // throw Error{name.line,"", "Variable not found in any scope."};
-
-  // for (auto i = m_scopes.size() - 1; i >= 0; --i) {
-  //   if (m_scopes.at(i).contains(name.lexem)) {
-  //     m_interp.resolve(expr, m_scopes.size() - 1 - i);
-  //   }
-  // }
 }
 
 void Resolver::resolveFunction(FunctionStmt const &function) {
-  beginScope();
   beginScope();
   for (Token const &param : function.params) {
     declare(param);
     define(param);
   }
   resolve(function.body);
-  endScope();
   endScope();
 }
 
