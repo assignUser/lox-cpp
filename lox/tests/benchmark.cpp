@@ -7,6 +7,7 @@
 
 #include "lox/interpreter.hpp"
 #include "lox/parser.hpp"
+#include "lox/resolver.hpp"
 #include "lox/scanner.hpp"
 
 const static std::string fib_source =
@@ -25,6 +26,8 @@ TEST_CASE("Benchmark e2e", "[benchmark]") {
   Parser p{Scanner{fib_source}.scanTokens()};
   auto ast{p.parse()};
   Interpreter interp{};
+  Resolver resolver{interp};
+  resolver.resolve(ast.value());
 
   REQUIRE_FALSE(p.hasError());
   BENCHMARK("fibonacci 20") { return interp.interpret(ast.value()); };
