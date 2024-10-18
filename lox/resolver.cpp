@@ -32,7 +32,8 @@ void Resolver::resolveLocal(Expr const *const expr, Token const &name) {
   }
 }
 
-void Resolver::resolveFunction(FunctionStmt const &function, FunctionType function_type) {
+void Resolver::resolveFunction(FunctionStmt const &function,
+                               FunctionType function_type) {
   FunctionType enclosing_function = m_currentFunction;
   m_currentFunction = function_type;
 
@@ -52,10 +53,10 @@ void Resolver::declare(Token const &name) {
     return;
   }
 
-  if (m_scopes.back().contains(name.lexem)){
+  if (m_scopes.back().contains(name.lexem)) {
     had_error = true;
-    report(RuntimeError(name,
-                        "Already a variable with this name in this scope."));
+    report(Error{name.line, fmt::format("at '{}'", name.lexem),
+            "Already a variable with this name in this scope."});
   }
 
   m_scopes.back().insert_or_assign(name.lexem, false);
@@ -87,8 +88,8 @@ void Resolver::visit(Variable const &expr) {
   if (not m_scopes.empty() and m_scopes.back().contains(expr.name.lexem) and
       not m_scopes.back()[expr.name.lexem]) {
     had_error = true;
-    report(RuntimeError(expr.name,
-                        "Can't read local variable in its own initializer."));
+    report(Error{expr.name.line, fmt::format("at '{}'", expr.name.lexem),
+            "Can't read local variable in its own initializer."});
   }
 
   resolveLocal(&expr, expr.name);
@@ -117,10 +118,10 @@ void Resolver::visit(If const &stmt) {
 void Resolver::visit(Print const &stmt) { resolve(stmt.expr.get()); }
 
 void Resolver::visit(Return const &stmt) {
-  if (m_currentFunction == FunctionType::NONE){
+  if (m_currentFunction == FunctionType::NONE) {
     had_error = true;
-    report(RuntimeError(stmt.keyword,
-                        "Can't return from top-level code."));
+    report(Error{stmt.keyword.line, fmt::format("at '{}'", stmt.keyword.lexem),
+            "Can't return from top-level code."});
   }
 
   if (stmt.value) {
