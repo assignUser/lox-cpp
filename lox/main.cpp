@@ -110,7 +110,7 @@ tl::expected<int, Error> run(std::string_view source) {
   resolver.resolve(statements.value());
 
   if (resolver.had_error){
-    // Don't run interpreter on input with resovler error.
+    // Don't run interpreter on input with resolver error.
     return 65;
   }
   

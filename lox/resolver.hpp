@@ -42,11 +42,11 @@ public:
   bool had_error{false};
 
 private:
+  enum class FunctionType { NONE, FUNCTION };
   void resolve(Expr const *expr);
   void resolve(Stmt const *stmt);
   void resolveLocal(Expr const *const expr, Token const &name);
-  void resolveFunction(FunctionStmt const &function);
-
+  void resolveFunction(FunctionStmt const &function, FunctionType function_type);
   void beginScope() { m_scopes.emplace_back(); }
   void endScope() { m_scopes.pop_back(); }
 
@@ -54,4 +54,5 @@ private:
   void define(Token const &name);
   Interpreter &m_interp;
   ScopeStack m_scopes{};
+  FunctionType m_currentFunction = FunctionType::NONE;
 };

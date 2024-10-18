@@ -32,7 +32,10 @@ void Resolver::resolveLocal(Expr const *const expr, Token const &name) {
   }
 }
 
-void Resolver::resolveFunction(FunctionStmt const &function) {
+void Resolver::resolveFunction(FunctionStmt const &function, FunctionType function_type) {
+  FunctionType enclosing_function = m_currentFunction;
+  m_currentFunction = function_type;
+
   beginScope();
   for (Token const &param : function.params) {
     declare(param);
@@ -40,12 +43,22 @@ void Resolver::resolveFunction(FunctionStmt const &function) {
   }
   resolve(function.body);
   endScope();
+
+  m_currentFunction = enclosing_function;
 }
 
 void Resolver::declare(Token const &name) {
-  if (not m_scopes.empty()) {
-    m_scopes.back().insert_or_assign(name.lexem, false);
+  if (m_scopes.empty()) {
+    return;
   }
+
+  if (m_scopes.back().contains(name.lexem)){
+    had_error = true;
+    report(RuntimeError(name,
+                        "Already a variable with this name in this scope."));
+  }
+
+  m_scopes.back().insert_or_assign(name.lexem, false);
 }
 
 void Resolver::define(Token const &name) {
@@ -90,7 +103,7 @@ void Resolver::visit(FunctionStmt const &stmt) {
   declare(stmt.name);
   define(stmt.name);
 
-  resolveFunction(stmt);
+  resolveFunction(stmt, FunctionType::FUNCTION);
 }
 
 void Resolver::visit(Expression const &stmt) { resolve(stmt.expr.get()); }
@@ -104,6 +117,12 @@ void Resolver::visit(If const &stmt) {
 void Resolver::visit(Print const &stmt) { resolve(stmt.expr.get()); }
 
 void Resolver::visit(Return const &stmt) {
+  if (m_currentFunction == FunctionType::NONE){
+    had_error = true;
+    report(RuntimeError(stmt.keyword,
+                        "Can't return from top-level code."));
+  }
+
   if (stmt.value) {
     resolve(stmt.value.get());
   }
