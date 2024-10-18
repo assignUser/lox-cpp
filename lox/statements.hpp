@@ -40,7 +40,7 @@ private:
   StmtKind m_kind;
 };
 
-const static std::map<Stmt::StmtKind, std::string_view> stmt_kind_literals{
+const static std::unordered_map<Stmt::StmtKind, std::string_view> stmt_kind_literals{
     {Stmt::StmtKind::Block, "Block"},
     {Stmt::StmtKind::Expression, "Expression"},
     {Stmt::StmtKind::FunctionStmt, "FunctionStmt"},

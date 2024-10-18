@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #pragma once
 
-#include <map>
+#include <unordered_map>
 #include <string>
 
 #include <tl/optional.hpp>
@@ -34,5 +34,5 @@ public:
   tl::optional<std::shared_ptr<Environment>> enclosing{tl::nullopt};
 
 private:
-  std::map<std::string, ExprPtr> m_values{};
+  std::unordered_map<std::string, ExprPtr> m_values{};
 };

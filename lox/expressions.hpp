@@ -54,7 +54,7 @@ private:
 };
 
 // detail namespace?
-const static std::map<Expr::ExprKind, std::string_view> expr_kind_literals{
+const static std::unordered_map<Expr::ExprKind, std::string_view> expr_kind_literals{
     {Expr::ExprKind::Binary, "Binary"},
     {Expr::ExprKind::Boolean, "Boolean"},
     {Expr::ExprKind::Grouping, "Grouping"},

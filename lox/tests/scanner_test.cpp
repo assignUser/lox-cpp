@@ -19,7 +19,7 @@
 
 #include "lox/token.hpp"
 
-static const std::map<Token::Type, std::string_view> simple_tokens{
+static const std::unordered_map<Token::Type, std::string_view> simple_tokens{
     {Token::Type::LEFT_PAREN, "("},     {Token::Type::RIGHT_PAREN, ")"},
     {Token::Type::LEFT_BRACE, "{"},     {Token::Type::RIGHT_BRACE, "}"},
     {Token::Type::COMMA, ","},          {Token::Type::DOT, "."},

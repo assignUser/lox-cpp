@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #pragma once
 
-#include <map>
+#include <unordered_map>
 #include <numeric>
 #include <string>
 #include <utility>
@@ -68,7 +68,7 @@ struct Token {
   std::variant<std::string, double> literal{};
   int line{};
 
-  static const inline std::map<std::string_view, Token::Type> keywords{
+  static const inline std::unordered_map<std::string_view, Token::Type> keywords{
       {"and", Token::Type::AND},       {"class", Token::Type::CLASS},
       {"else", Token::Type::ELSE},     {"false", Token::Type::FALSE},
       {"fun", Token::Type::FUN},       {"for", Token::Type::FOR},
@@ -78,7 +78,7 @@ struct Token {
       {"this", Token::Type::THIS},     {"true", Token::Type::TRUE},
       {"var", Token::Type::VAR},       {"while", Token::Type::WHILE}};
 
-  static const inline std::map<Token::Type, std::string_view> token_literals{
+  static const inline std::unordered_map<Token::Type, std::string_view> token_literals{
       {Token::Type::LEFT_PAREN, "("},
       {Token::Type::RIGHT_PAREN, ")"},
       {Token::Type::LEFT_BRACE, "{"},

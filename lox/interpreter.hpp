@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include <unordered_map>
 
 #include <tl/optional.hpp>
 
@@ -68,7 +69,7 @@ private:
   ExprPtr m_tmp;
   bool m_hasError{false};
   std::shared_ptr<Environment> m_env{};
-  std::map<Expr const *const, size_t> m_locals{};
+  std::unordered_map<Expr const *, size_t> m_locals{};
 
   class Context {
     // RAII alternative to Javas try{}finally to ensure the previous environment

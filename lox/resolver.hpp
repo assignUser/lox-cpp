@@ -3,14 +3,14 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #pragma once
 
-#include <map>
+#include <unordered_map>
 #include <stack>
 #include <vector>
 
 #include "lox/fwd.hpp"
 
 class Resolver : public Visitor {
-  using Scope = std::map<std::string, bool>;
+  using Scope = std::unordered_map<std::string, bool>;
   using ScopeStack = std::vector<Scope>;
 
 public:

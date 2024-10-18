@@ -26,7 +26,7 @@
 
 using std::string_view_literals::operator""sv;
 class Counter : public Visitor {
-  std::map<std::string, int> m_counts{};
+  std::unordered_map<std::string, int> m_counts{};
   void incrementCount(std::string const &name) {
     if (m_counts.contains(name)) {
       ++m_counts.at(name);
