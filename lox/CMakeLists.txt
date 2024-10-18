@@ -75,7 +75,7 @@ target_link_libraries(
           bfg::lyra)
 
 find_program(dart_bin dart)
-if(NOT ${dart_bin} STREQUAL dart-NOTFOUND)
+if(NOT ${dart_bin} STREQUAL dart_bin-NOTFOUND)
   add_custom_command(
     OUTPUT ${lox_tests_SOURCE_DIR}/tool/dart_deps_installed
     COMMAND ${dart_bin} pub get
