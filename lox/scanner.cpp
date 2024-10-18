@@ -39,8 +39,9 @@ void Scanner::identifier() {
   std::string lexem = m_source.substr(m_start, m_current - m_start);
   if (Token::keywords.contains(lexem)) {
     type = Token::keywords.at(lexem);
+    lexem.clear();
   }
-  addToken(type);
+  addToken(type, lexem);
 }
 
 bool Scanner::match(char expected) {

@@ -2,6 +2,7 @@
 //
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include <fstream>
+#include <memory>
 #include <numeric>
 #include <string_view>
 #include <utility>
@@ -14,11 +15,13 @@
 #include "lyra/help.hpp"
 #include "tl/expected.hpp"
 
-#include "lox/ast.hpp"
+#include "lox/expressions.hpp"
+#include "lox/statements.hpp"
 #include "lox/error.hpp"
 #include "lox/interpreter.hpp"
 #include "lox/parser.hpp"
 #include "lox/scanner.hpp"
+#include "lox/resolver.hpp"
 
 using std::operator""sv;
 
@@ -73,6 +76,8 @@ public:
   void visit(Nil const &expr) override { m_str.append(" NIL "sv); }
   void visit(Expression const &expr) override { ; }
   void visit(Print const &expr) override { ; }
+  void visit(Var const &expr) override { ; }
+  void visit(Variable const &expr) override { ; }
 
 private:
   std::string m_str{""};
@@ -85,18 +90,34 @@ tl::expected<int, Error> run(std::string_view source) {
     for (auto const &error : scanner.getErrors()) {
       report(error);
     }
-    return tl::unexpected(Error{0, "", "Error while scanning."});
+    return 65;
   }
-  auto parser = Parser{tokens};
-  tl::expected<ExprPtr, Error> expression = parser.parse();
 
-  if (not expression) {
-    return tl::unexpected(expression.error());
-  } else {
-    Printer{}.print(expression->get());
-    static Interpreter interpreter{}; 
-    interpreter.evaluate(expression.value().get());
-    // TODO pass on error via expected.
+  auto parser = Parser{tokens};
+  tl::expected<std::vector<StmtPtr>, Error> statements = parser.parse();
+  if (not statements) {
+    return tl::unexpected(statements.error());
+  }
+
+  if (parser.hasError()){
+    // Don't run interpreter on input with parser error.
+    return 65;
+  }
+  
+  static Interpreter interpreter{};
+
+  Resolver resolver{interpreter};
+  resolver.resolve(statements.value());
+
+  if (resolver.had_error){
+    // Don't run interpreter on input with resolver error.
+    return 65;
+  }
+  
+  interpreter.interpret(statements.value());
+
+  if (interpreter.hasError()) {
+    return 70;
   }
 
   return 0;
@@ -108,7 +129,6 @@ tl::expected<int, Error> runFile(std::vector<std::string> const &filenames) {
   for (auto const &filename : filenames) {
     std::ifstream file(filename);
     if (file.is_open()) {
-      fmt::print("Parsing {} ...\n", filename);
       std::string source((std::istreambuf_iterator<char>(file)),
                          std::istreambuf_iterator<char>());
 
@@ -162,5 +182,5 @@ int main(int argc, char **argv) {
     // TODO exit codes
     std::exit(1);
   }
-  return 0;
+  return result.value();
 }

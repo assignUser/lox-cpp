@@ -3,7 +3,13 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #include "lox/parser.hpp"
 
+#include <vector>
+
+#include <tl/optional.hpp>
+
 #include "lox/error.hpp"
+#include "lox/expressions.hpp"
+#include "lox/statements.hpp"
 
 Token const &Parser::advance() {
   if (not atEnd()) {
@@ -28,7 +34,7 @@ Token const &Parser::consume(Token::Type type, std::string const &message) {
   throw error(peek(), message);
 }
 
-Error Parser::error(Token const& token, std::string const &message) {
+Error Parser::error(Token const &token, std::string const &message) {
   Error error = token.type == Token::Type::END_OF_FILE
                     ? Error{token.line, "at end", message}
                     : Error{token.line, "at '" + token.lexem + "'", message};
@@ -65,16 +71,258 @@ void Parser::synchronize() {
   }
 }
 
-tl::expected<ExprPtr, Error> Parser::parse() {
+tl::expected<std::vector<StmtPtr>, Error> Parser::parse() {
+  std::vector<StmtPtr> statements{};
   try {
-    return expression();
+    while (not atEnd()) {
+      statements.push_back(declaration());
+    }
   } catch (Error e) {
+    m_hasError = true;
     return tl::unexpected(e);
   }
+  return statements;
 }
 
 // ast
-ExprPtr Parser::expression() { return equality(); }
+StmtPtr Parser::declaration() {
+  try {
+    if (match(Token::Type::VAR)) {
+      return varDeclaration();
+    } else if (match(Token::Type::FUN)) {
+      return function("function");
+    }
+
+    return statement();
+    // This should be a specialized parse error
+  } catch (Error e) {
+    m_hasError = true;
+    synchronize();
+    return Expression::make(Nil::make());
+  }
+}
+StmtPtr Parser::function(std::string const &kind) {
+  Token name =
+      consume(Token::Type::IDENTIFIER, fmt::format("Expect {} name.", kind));
+
+  consume(Token::Type::LEFT_PAREN,
+          fmt::format("Expect '(' after {} name.", kind));
+
+  std::vector<Token> parameters{};
+  auto consume_identifier = [&]() {
+    parameters.push_back(
+        consume(Token::Type::IDENTIFIER, "Expect parameter name."));
+  };
+
+  if (not check(Token::Type::RIGHT_PAREN)) {
+    consume_identifier();
+
+    while (match(Token::Type::COMMA)) {
+      if (parameters.size() >= 255) {
+        m_hasError = true;
+        (void)error(peek(), "Can't have more than 255 parameters.");
+      }
+
+      consume_identifier();
+    }
+  }
+  consume(Token::Type::RIGHT_PAREN, "Expect ')' after parameters.");
+
+  consume(Token::Type::LEFT_BRACE,
+          fmt::format("Expect '{{' before {} body.", kind));
+  std::vector<StmtPtr> body = block();
+
+  return FunctionStmt::make(std::move(name), std::move(parameters),
+                            std::move(body));
+}
+
+StmtPtr Parser::varDeclaration() {
+  Token name = consume(Token::Type::IDENTIFIER, "Expect variable name.");
+
+  ExprPtr initializer = Nil::make();
+  if (match(Token::Type::EQUAL)) {
+    initializer = expression();
+  }
+
+  consume(Token::Type::SEMICOLON, "Expect ';' after variable declaration.");
+  return Var::make(name, std::move(initializer));
+}
+
+StmtPtr Parser::statement() {
+  if (match(Token::Type::FOR)) {
+    return forStatement();
+  } else if (match(Token::Type::IF)) {
+    return ifStatement();
+  } else if (match(Token::Type::PRINT)) {
+    return printStatement();
+  } else if (match(Token::Type::RETURN)) {
+    return returnStatement();
+  } else if (match(Token::Type::WHILE)) {
+    return whileStatement();
+  } else if (match(Token::Type::LEFT_BRACE)) {
+    return Block::make(block());
+  } else {
+    return expressionStatement();
+  }
+}
+
+StmtPtr Parser::printStatement() {
+  ExprPtr value = expression();
+  consume(Token::Type::SEMICOLON, "Expect ';' after value.");
+  return Print::make(std::move(value));
+}
+
+StmtPtr Parser::ifStatement() {
+  consume(Token::Type::LEFT_PAREN, "Expect '(' after 'if'.");
+  ExprPtr condition = expression();
+  consume(Token::Type::RIGHT_PAREN, "Expect ')' after if condition.");
+
+  StmtPtr then_branch = statement();
+  tl::optional<StmtPtr> else_branch = tl::nullopt;
+
+  if (match(Token::Type::ELSE)) {
+    else_branch = statement();
+  }
+
+  return If::make(std::move(condition), std::move(then_branch),
+                  std::move(else_branch));
+}
+
+StmtPtr Parser::whileStatement() {
+  consume(Token::Type::LEFT_PAREN, "Expect '(' after 'while'.");
+  ExprPtr condition = expression();
+  consume(Token::Type::RIGHT_PAREN, "Expect ')' after condition.");
+  StmtPtr body = statement();
+
+  return While::make(std::move(condition), std::move(body));
+}
+
+StmtPtr Parser::forStatement() {
+  consume(Token::Type::LEFT_PAREN, "Expect '(' after 'for'.");
+  StmtPtr initializer;
+  if (match(Token::Type::SEMICOLON)) {
+    // initializer omitted
+  } else if (match(Token::Type::VAR)) {
+    initializer = varDeclaration();
+  } else {
+    initializer = expressionStatement();
+  }
+
+  ExprPtr condition;
+  if (not check(Token::Type::SEMICOLON)) {
+    condition = expression();
+  }
+  consume(Token::Type::SEMICOLON, "Expect ';' after loop condition.");
+
+  ExprPtr increment;
+  if (not check(Token::Type::RIGHT_PAREN)) {
+    increment = expression();
+  }
+  consume(Token::Type::RIGHT_PAREN, "Expect ')' after for clauses.");
+
+  StmtPtr body = statement();
+
+  if (increment) {
+    std::vector<StmtPtr> stmts;
+    // TODO what's the issue with construct_at?
+    stmts.push_back(std::move(body));
+    stmts.push_back(Expression::make(std::move(increment)));
+    body = Block::make(std::move(stmts));
+  }
+
+  if (not condition) {
+    condition = Boolean::make(true);
+  }
+  body = While::make(std::move(condition), std::move(body));
+
+  if (initializer) {
+    std::vector<StmtPtr> stmts;
+    stmts.push_back(std::move(initializer));
+    stmts.push_back(std::move(body));
+
+    body = Block::make(std::move(stmts));
+  }
+
+  return body;
+}
+
+StmtPtr Parser::returnStatement() {
+  Token keyword{previous()};
+  ExprPtr value = Nil::make();
+
+  if (not check(Token::Type::SEMICOLON)) {
+    value = expression();
+  }
+
+  consume(Token::Type::SEMICOLON, "Expect ';' after return value.");
+
+  return Return::make(std::move(keyword), std::move(value));
+}
+
+StmtPtr Parser::expressionStatement() {
+  ExprPtr expr = expression();
+  consume(Token::Type::SEMICOLON, "Expect ';' after expression.");
+  return Expression::make(std::move(expr));
+}
+
+//"{" declaration* "}" ;
+std::vector<StmtPtr> Parser::block() {
+  std::vector<StmtPtr> stmts{};
+
+  while (not check(Token::Type::RIGHT_BRACE) && not atEnd()) {
+    stmts.push_back(declaration());
+  }
+
+  consume(Token::Type::RIGHT_BRACE, "Expect '}' after block.");
+  return stmts;
+}
+
+ExprPtr Parser::expression() { return assignment(); }
+
+// assignment     → IDENTIFIER "=" assignment | equality;
+ExprPtr Parser::assignment() {
+  ExprPtr expr = logicOr();
+
+  if (match(Token::Type::EQUAL)) {
+    Token equals = previous();
+    ExprPtr value = assignment();
+
+    if (isA<Variable>(*expr.get())) {
+      Token name = expr_as<Variable>(*expr.get()).name;
+      return Assign::make(name, std::move(value));
+    }
+    m_hasError = true;
+    // casting to void explicitly disables the `[[nodiscard]]` warning
+    (void)error(equals, "Invalid assignment target.");
+  }
+
+  return expr;
+}
+
+ExprPtr Parser::logicOr() {
+  ExprPtr expr = logicAnd();
+
+  while (match(Token::Type::OR)) {
+    Token op = previous();
+    ExprPtr rhs = logicAnd();
+    expr = Binary::make(std::move(expr), op, std::move(rhs));
+  }
+
+  return expr;
+}
+
+ExprPtr Parser::logicAnd() {
+  ExprPtr expr = equality();
+
+  while (match(Token::Type::AND)) {
+    Token op = previous();
+    ExprPtr rhs = equality();
+    expr = Binary::make(std::move(expr), op, std::move(rhs));
+  }
+
+  return expr;
+}
+
 // equality → comparison (("!=" | "==") comparison)* ;
 ExprPtr Parser::equality() {
   ExprPtr expr = comparison();
@@ -130,9 +378,47 @@ ExprPtr Parser::unary() {
   if (match(Token::Type::BANG, Token::Type::MINUS)) {
     Token const &op = previous();
     ExprPtr rhs = unary();
-    return Unary::make(op, std::move(rhs));
+    return Unary::make(op, rhs);
   }
-  return primary();
+  return call();
+}
+
+// call → primary ( "(" arguments? ")" )* ;
+ExprPtr Parser::call() {
+  ExprPtr expr = primary();
+
+  while (true) {
+    if (match(Token::Type::LEFT_PAREN)) {
+      expr = finishCall(std::move(expr));
+    } else {
+      break;
+    }
+  }
+
+  return expr;
+}
+
+// arguments → expression ( "," expression )* ;
+ExprPtr Parser::finishCall(ExprPtr callee) {
+  std::vector<ExprPtr> arguments;
+
+  if (not check(Token::Type::RIGHT_PAREN)) {
+    arguments.push_back(expression());
+
+    while (match(Token::Type::COMMA)) {
+      if (arguments.size() >= 255) {
+        m_hasError = true;
+        // casting to void explicitly disables the `[[nodiscard]]` warning
+        (void)error(peek(), "Can't have more than 255 arguments.");
+      }
+      arguments.push_back(expression());
+    }
+  }
+
+  Token paren =
+      consume(Token::Type::RIGHT_PAREN, "Expect ')' after arguments.");
+
+  return Call::make(std::move(callee), std::move(paren), std::move(arguments));
 }
 
 // primary → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")";
@@ -148,14 +434,14 @@ ExprPtr Parser::primary() {
     return String::make(std::get<std::string>(previous().literal));
   } else if (match(Token::Type::NUMBER)) {
     return Number::make(std::get<double>(previous().literal));
+  } else if (match(Token::Type::IDENTIFIER)) {
+    return Variable::make(previous());
   } else if (match(Token::Type::LEFT_PAREN)) {
     ExprPtr expr = expression();
     // consume should use unexpected?
-    consume(Token::Type::RIGHT_PAREN, "Expect ')' after Expression.");
+    consume(Token::Type::RIGHT_PAREN, "Expect ')' after expression.");
     return Grouping::make(std::move(expr));
   } else {
     throw error(peek(), "Expect expression.");
   }
 }
-
-

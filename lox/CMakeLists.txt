@@ -1,21 +1,27 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # SPDX-FileCopyrightText: Copyright (c) assignUser
-add_library(util_header INTERFACE)
+add_library(util_header)
 configure_target(util_header)
 target_sources(
   util_header
-  INTERFACE FILE_SET
-            HEADERS
-            BASE_DIRS
-            ${PROJECT_SOURCE_DIR}
-            FILES
-            ast.hpp
-            error.hpp
-            token.hpp)
+  PUBLIC FILE_SET
+         HEADERS
+         BASE_DIRS
+         ${PROJECT_SOURCE_DIR}
+         FILES
+         expressions.hpp
+         error.hpp
+         statements.hpp
+         token.hpp)
+
+target_sources(
+  util_header
+  PUBLIC statements.cpp)
+
 target_link_libraries(
   util_header
-  INTERFACE fmt::fmt)
+  PUBLIC fmt::fmt tl::optional)
 
 add_library(frontend)
 configure_target(frontend)
@@ -32,24 +38,26 @@ target_sources(
 target_link_libraries(
   frontend
   PUBLIC lox::util_header tl::expected
-  PRIVATE fmt::fmt)
+  PRIVATE fmt::fmt tl::optional)
 
 add_library(backend)
 configure_target(backend)
 target_sources(
   backend
-  PRIVATE interpreter.cpp
+  PRIVATE env.cpp resolver.cpp interpreter.cpp
   PUBLIC FILE_SET
          HEADERS
          BASE_DIRS
          ${PROJECT_SOURCE_DIR}
          FILES
+         env.hpp
+         resolver.hpp
          interpreter.hpp)
 
 target_link_libraries(
   backend
   PUBLIC lox::util_header
-  PRIVATE fmt::fmt)
+  PRIVATE fmt::fmt tl::optional)
 
 add_executable(lox)
 configure_target(lox)
@@ -66,6 +74,20 @@ target_link_libraries(
           tl::optional
           bfg::lyra)
 
-if(BUILD_TESTING)
-  add_subdirectory(tests)
+find_program(dart_bin dart)
+if(NOT ${dart_bin} STREQUAL dart_bin-NOTFOUND)
+  add_custom_command(
+    OUTPUT ${lox_tests_SOURCE_DIR}/tool/dart_deps_installed
+    COMMAND ${dart_bin} pub get
+    COMMAND touch dart_deps_installed
+    WORKING_DIRECTORY ${lox_tests_SOURCE_DIR}/tool)
+  add_custom_target(install_dart_deps DEPENDS ${lox_tests_SOURCE_DIR}/tool/dart_deps_installed)
+  add_dependencies(lox install_dart_deps)
+
+  add_test(
+    NAME lox-validation
+    COMMAND ${dart_bin} tool/bin/test.dart chap11_resolving -i ${lox_BINARY_DIR}/lox/lox
+    WORKING_DIRECTORY ${lox_tests_SOURCE_DIR})
 endif()
+
+add_subdirectory(tests)

@@ -2,7 +2,7 @@
 //
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
-#include "lox/ast.hpp"
+#include "lox/expressions.hpp"
 
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>

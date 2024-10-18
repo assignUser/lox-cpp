@@ -4,54 +4,107 @@
 
 #include "lox/interpreter.hpp"
 
+#include <chrono>
+#include <fmt/core.h>
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "fmt/format.h"
 
 #include "lox/error.hpp"
 
-void Interpreter::eval(Expr const* expr) { expr->accept(*this); }
+namespace lox_std {
+class Clock : public NativeFunction {
+public:
+  [[nodiscard]] static ExprPtr make() {
+    return std::unique_ptr<Clock>(new Clock());
+  }
+  [[nodiscard]] bool equals(Expr const &other) const override { return false; }
+  [[nodiscard]] size_t arity() const noexcept override { return 0; };
+  ExprPtr call(Interpreter &interpreter,
+               std::vector<ExprPtr> arguments) override {
+    return Number::make(std::chrono::duration_cast<std::chrono::seconds>(
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count());
+  }
 
-Expr const &Interpreter::evaluate(Expr const*expr) {
+private:
+  explicit Clock() : NativeFunction() {}
+  std::chrono::steady_clock m_clock{};
+};
+} // namespace lox_std
+
+void Interpreter::importStd() {
+  globals->define("clock", lox_std::Clock::make());
+}
+
+void Interpreter::evaluate(Expr const *expr) { expr->accept(*this); }
+void Interpreter::execute(Stmt const *stmt) { stmt->accept(*this); }
+// TODO ExprPtr makes no sense as return, rather use exit codes or error?
+ExprPtr Interpreter::interpret(std::vector<StmtPtr> const &statements) {
   try {
-    eval(expr);
-    if (isA<String>(*m_result)) {
-      fmt::println("{}", expr_as<String>(*m_result).value);
-    } else if (isA<Number>(*m_result)) {
-      fmt::println("{}", expr_as<Number>(*m_result).value);
-    } else if (isA<Boolean>(*m_result)) {
-      fmt::println("{}", expr_as<Boolean>(*m_result).value);
-    } else if (isA<Nil>(*m_result)) {
-      fmt::println("Nil");
-    } else {
-      throw Error{
-          0, "",
-          fmt::format("Unexpected result type {}.", m_result->getKind())};
+    for (auto const &stmt : statements) {
+      execute(stmt.get());
     }
-
-  } catch (Error e) {
+  } catch (RuntimeError e) {
     m_hasError = true;
     report(e);
     m_result = Nil::make();
   }
 
-  return *m_result;
+  ExprPtr res = m_result;
+  m_result.reset();
+  return res;
+}
+
+ExprPtr Interpreter::interpret(Expr const *expr) {
+  try {
+    evaluate(expr);
+  } catch (RuntimeError e) {
+    m_hasError = true;
+    report(e);
+    m_result = Nil::make();
+  }
+
+  ExprPtr res = m_result;
+  m_result.reset();
+  return res;
 }
 
 void Interpreter::visit(Binary const &expr) {
-  eval(expr.lhs.get());
-  ExprPtr lhs{std::move(m_result)};
-  eval(expr.rhs.get());
-  ExprPtr rhs{std::move(m_result)};
+  evaluate(expr.lhs.get());
+  // short-circuit `and` and `or`
+  // I am not totally sold on using these as control flow with returning the
+  // operand vs always returning a Boolean but I'll follow the  book for now.
+  if (expr.op.type == Token::Type::AND and not m_result->truthy()) {
+    // `and` returns the left operand if `false` and rhs otherwise
+    return;
+  } else if (expr.op.type == Token::Type::OR and m_result->truthy()) {
+    // `or` returns the lhs if `true` and rhs otherwise
+    return;
+  }
+  // post-pone move until after short-circuit evaluation
+  ExprPtr lhs{m_result};
+
+  evaluate(expr.rhs.get());
 
   switch (expr.op.type) {
   case Token::Type::EQUAL_EQUAL:
-    m_result = Boolean::make(rhs->equals(*lhs));
+    m_result = Boolean::make(m_result->equals(*lhs));
     return;
   case Token::Type::BANG_EQUAL:
-    m_result = Boolean::make(not rhs->equals(*lhs));
+    m_result = Boolean::make(not m_result->equals(*lhs));
+    return;
+  case Token::Type::AND:
+  case Token::Type::OR:
+    // m_result = rhs
     return;
   default:
     break;
   }
+
+  ExprPtr rhs{m_result};
 
   if (isA<Number>(*lhs) and isA<Number>(*rhs)) {
     switch (expr.op.type) {
@@ -88,11 +141,10 @@ void Interpreter::visit(Binary const &expr) {
                                expr_as<Number>(*rhs).value);
       break;
     default:
-      throw Error{
-          0, "",
-          fmt::format(
-              "Invalid operator '{}' for binary expression <Number op Number>.",
-              expr.op.lexem)};
+      throw RuntimeError{expr.op,
+                         fmt::format("Invalid operator '{0}' for binary "
+                                     "expression `Number {0} Number`.",
+                                     expr.op.lexem)};
     }
     return;
   }
@@ -103,26 +155,26 @@ void Interpreter::visit(Binary const &expr) {
                               expr_as<String>(*rhs).value);
       return;
     } else {
-      throw Error{
-          0, "",
-          fmt::format(
-              "Invalid operator '{}' for binary expression <String op String>.",
-              expr.op.lexem)};
+      throw RuntimeError{expr.op,
+                         fmt::format("Invalid operator '{0}' for binary "
+                                     "expression `String {0} String`.",
+                                     expr.op.lexem)};
     }
   }
 
   // invalid operator or operands
-  throw Error{
-      0, "",
-      fmt::format("Invalid operator '{}' for binary expression <{} op {}>.",
-                  expr.op.lexem, expr.rhs->getKind(), expr.lhs->getKind())};
+  throw RuntimeError{
+      expr.op,
+      fmt::format("Invalid operator '{0}' for binary expression `{1} {0} {2}`.",
+                  expr.op.lexem, expr.lhs->getKind(), expr.rhs->getKind()),
+  };
 }
 
 void Interpreter::visit(Boolean const &expr) {
   m_result = Boolean::make(expr.value);
 }
 
-void Interpreter::visit(Grouping const &expr) { eval(expr.expr.get()); }
+void Interpreter::visit(Grouping const &expr) { evaluate(expr.expr.get()); }
 
 void Interpreter::visit(Nil const &expr) { m_result = Nil::make(); }
 
@@ -135,31 +187,149 @@ void Interpreter::visit(String const &expr) {
 }
 
 void Interpreter::visit(Unary const &expr) {
-  eval(expr.expr.get());
+  evaluate(expr.expr.get());
   // properly not needed here
-  ExprPtr rhs{std::move(m_result)};
+  ExprPtr rhs{m_result};
 
   if (expr.op.type == Token::Type::MINUS) {
     if (isA<Number>(*rhs)) {
       m_result = Number::make(-expr_as<Number>(*rhs).value);
     } else {
-      throw   Error{
-          0, "",
+      throw RuntimeError{
+          expr.op,
           fmt::format("Invalid operand '{}' for unary '-'.", rhs->getKind())};
     }
 
   } else if (expr.op.type == Token::Type::BANG) {
-    //TODO: this currently ignores the actual value and just
-    // goes by nil, false = falsey, else = truthy
-    // e.g. !(false) = false instead of true because Grouping is truthy
+    // TODO: this currently ignores the actual value and just
+    //  goes by nil, false = falsey, else = truthy
+    //  e.g. !(false) = false instead of true because Grouping is truthy
     m_result = Boolean::make(not rhs->truthy());
   } else {
-      throw   Error{
-          0, "",
-          fmt::format("Invalid operator '{}' for unary expression.", expr.op.type)};
+    throw RuntimeError{
+        expr.op, fmt::format("Invalid operator '{}' for unary expression.",
+                             expr.op.type)};
   }
 }
 
-void Interpreter::visit(Expression const &expr) {;}
-void Interpreter::visit(Print const &expr) {;}
+void Interpreter::visit(Expression const &stmt) { evaluate(stmt.expr.get()); }
 
+void Interpreter::visit(Print const &stmt) {
+  evaluate(stmt.expr.get());
+  if (isA<String>(*m_result)) {
+    fmt::println("{}", expr_as<String>(*m_result).value);
+  } else if (isA<Number>(*m_result)) {
+    fmt::println("{}", expr_as<Number>(*m_result).value);
+  } else if (isA<Boolean>(*m_result)) {
+    fmt::println("{}", expr_as<Boolean>(*m_result).value);
+  } else if (isA<Nil>(*m_result)) {
+    fmt::println("nil");
+  } else if (isA<Function>(*m_result)) {
+    fmt::println("<fn {}>", stmt_as<FunctionStmt>(
+                                *expr_as<Function>(*m_result).declaration)
+                                .name.lexem);
+  } else if (isA<NativeFunction>(*m_result)) {
+    fmt::println("<native fn>");
+  } else {
+    throw RuntimeError{
+        Token{Token::Type::NIL, "", "", 0},
+        fmt::format("Unexpected result type {}.", m_result->getKind())};
+  }
+}
+
+void Interpreter::visit(Var const &var) {
+  ExprPtr value = Nil::make();
+  if (var.initializer->getKind() != Expr::ExprKind::Nil) {
+    evaluate(var.initializer.get());
+    value = m_result;
+  }
+
+  m_env->define(var.name.lexem, value);
+}
+
+void Interpreter::visit(Variable const &var) { lookUpVariable(var.name, &var); }
+void Interpreter::lookUpVariable(Token const &name, Expr const *const expr) {
+  if (m_locals.contains(expr)) {
+    m_result = m_env->getAt(name, m_locals[expr]);
+  } else {
+    m_result = globals->get(name);
+  }
+}
+
+void Interpreter::visit(Assign const &expr) {
+  evaluate(expr.value.get());
+  if (m_locals.contains(&expr)) {
+    m_env->assignAt(expr.name, m_result, m_locals[&expr]);
+  } else {
+    globals->assign(expr.name, m_result);
+  }
+}
+
+void Interpreter::visit(Block const &stmt) {
+  executeBlock(stmt.statements, tl::nullopt);
+}
+
+void Interpreter::executeBlock(
+    std::vector<StmtPtr> const &statements,
+    tl::optional<std::shared_ptr<Environment>> parent_env) {
+  Context ctx{*this, std::move(parent_env)};
+
+  for (auto const &stmt : statements) {
+    ctx.execute(stmt.get());
+  }
+}
+
+void Interpreter::visit(If const &stmt) {
+  evaluate(stmt.condition.get());
+  if (m_result->truthy()) {
+    execute(stmt.then_branch.get());
+  } else if (stmt.else_branch) {
+    execute(stmt.else_branch->get());
+  }
+}
+
+void Interpreter::visit(While const &stmt) {
+  evaluate(stmt.condition.get());
+  while (m_result->truthy()) {
+    execute(stmt.body.get());
+    evaluate(stmt.condition.get());
+  }
+}
+
+void Interpreter::visit(Call const &expr) {
+  evaluate(expr.callee.get());
+  ExprPtr callee = m_result;
+  if (not callee->isCallable()) {
+    throw RuntimeError{expr.paren, "Can only call functions and classes."};
+  }
+
+  std::vector<ExprPtr> arguments;
+  for (ExprPtr const &argument : expr.arguments) {
+    evaluate(argument.get());
+    arguments.push_back(m_result);
+  }
+
+  auto &function = dynamic_cast<Callable &>(*callee);
+
+  if (arguments.size() != function.arity()) {
+    throw RuntimeError{expr.paren,
+                       fmt::format("Expected {} arguments but got {}.",
+                                   function.arity(), arguments.size())};
+  }
+
+  m_result = function.call(*this, std::move(arguments));
+}
+
+void Interpreter::visit(Function const &expr) { ; }
+void Interpreter::visit(FunctionStmt const &stmt) {
+  m_env->define(stmt.name.lexem, Function::make(std::make_shared<FunctionStmt>(stmt), m_env));
+}
+
+void Interpreter::visit(Return const &stmt) {
+  evaluate(stmt.value.get());
+
+  ExprPtr value{Nil::make()};
+  std::swap(m_result, value);
+
+  throw Return::make(stmt.keyword, value);
+}

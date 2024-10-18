@@ -10,19 +10,21 @@
 #include <fmt/core.h>
 #include <stdexcept>
 
-#include "lox/ast.hpp"
+#include "lox/expressions.hpp"
 #include "lox/token.hpp"
 
 enum class ResultType { NUMBER, BOOLEAN, NIL, UNDEFINED };
-using ValidExpr = std::pair<ResultType, std::reference_wrapper<Expr const>>;
+using ValidExpr =
+    std::pair<ResultType, std::reference_wrapper<std::vector<StmtPtr> const>>;
 class ValidExprGenerator : public Catch::Generators::IGenerator<ValidExpr> {
 public:
   bool next() override {
     m_depth = 0;
     m_result_type = ResultType::UNDEFINED;
-    m_current_expr = expression();
-    m_current_result =
-        std::make_pair(m_result_type, std::cref(*m_current_expr));
+    std::vector<StmtPtr> stmts{};
+    stmts.push_back(Expression::make(expression()));
+    m_current_expr = std::move(stmts);
+    m_current_result = std::make_pair(m_result_type, std::cref(m_current_expr));
     return true;
   }
 
@@ -38,9 +40,9 @@ private:
   int m_depth{0};
   int m_max_depth{50};
   ResultType m_result_type{ResultType::UNDEFINED};
-  ExprPtr m_current_expr{};
+  std::vector<StmtPtr> m_current_expr{};
   ValidExpr m_current_result{
-      std::pair(m_result_type, std::cref(*m_current_expr))};
+      std::pair(m_result_type, std::cref(m_current_expr))};
 
   ExprPtr expression(ResultType type = ResultType::UNDEFINED) {
 
@@ -408,6 +410,17 @@ public:
     return m_str;
   }
 
+  std::string print(std::vector<StmtPtr> const &statements) {
+    for (auto const &stmt : statements) {
+      if (not m_str.empty()) {
+        m_str += '\n';
+      }
+
+      stmt->accept(*this);
+    }
+    return m_str;
+  }
+
   void visit(Binary const &expr) override {
     expr.lhs->accept(*this);
     m_str += fmt::format(" {} ", expr.op.lexem);
@@ -440,6 +453,8 @@ public:
   void visit(Nil const &expr) override { m_str.append("NIL"); }
   void visit(Expression const &expr) override { ; }
   void visit(Print const &expr) override { ; }
+  void visit(Var const &expr) override { ; }
+  void visit(Variable const &expr) override { ; }
 
 private:
   std::string m_str{""};

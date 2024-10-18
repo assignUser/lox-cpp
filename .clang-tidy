@@ -11,6 +11,8 @@ Checks: >
   modernize-*,
   -modernize-use-trailing-return-type,
   cppcoreguidelines-*,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-magic-numbers,
   readability-identifier-naming,
   performance-*
 CheckOptions:

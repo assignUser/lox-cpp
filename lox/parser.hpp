@@ -11,13 +11,13 @@
 
 #include <tl/expected.hpp>
 
-#include "lox/ast.hpp"
-#include "lox/error.hpp"
+#include "lox/fwd.hpp"
 #include "lox/token.hpp"
 
 class Parser {
 public:
-  tl::expected<ExprPtr, Error> parse();
+  bool hasError() { return m_hasError; }
+  tl::expected<std::vector<StmtPtr>, Error> parse();
   explicit Parser(std::vector<Token> tokens) : m_tokens{std::move(tokens)} {}
 
 private:
@@ -33,14 +33,31 @@ private:
   [[nodiscard]] Token const &previous() const;
   void synchronize();
   // ast
+  StmtPtr varDeclaration();
+  StmtPtr declaration();
+  StmtPtr function(std::string const &kind);
+  StmtPtr statement();
+  StmtPtr printStatement();
+  StmtPtr expressionStatement();
+  StmtPtr ifStatement();
+  StmtPtr whileStatement();
+  StmtPtr forStatement();
+  StmtPtr returnStatement();
+  std::vector<StmtPtr> block();
   ExprPtr expression();
+  ExprPtr assignment();
+  ExprPtr logicOr();
+  ExprPtr logicAnd();
   ExprPtr equality();
   ExprPtr comparison();
   ExprPtr term();
   ExprPtr factor();
   ExprPtr unary();
+  ExprPtr call();
+  ExprPtr finishCall(ExprPtr callee);
   ExprPtr primary();
 
   std::vector<Token> m_tokens{};
   size_t m_current{0};
+  bool m_hasError{false};
 };

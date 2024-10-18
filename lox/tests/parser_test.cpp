@@ -20,13 +20,13 @@
 #include <tuple>
 #include <vector>
 
-#include "lox/ast.hpp"
+#include "lox/expressions.hpp"
 #include "lox/parser.hpp"
 #include "lox/scanner.hpp"
 
 using std::string_view_literals::operator""sv;
 class Counter : public Visitor {
-  std::map<std::string, int> m_counts{};
+  std::unordered_map<std::string, int> m_counts{};
   void incrementCount(std::string const &name) {
     if (m_counts.contains(name)) {
       ++m_counts.at(name);
@@ -77,6 +77,8 @@ public:
   void visit(Nil const &expr) override { incrementCount("Nil"); }
   void visit(Expression const &expr) override { incrementCount("Expression"); }
   void visit(Print const &expr) override { incrementCount("Print"); }
+  void visit(Var const &expr) override { incrementCount("Var"); }
+  void visit(Variable const &expr) override { incrementCount("Var"); }
 };
 
 class Printer : public Visitor {
@@ -89,10 +91,30 @@ public:
   Printer &operator=(Printer &&) = delete;
   ~Printer() override = default;
 
+  std::string format(Expr const *expr) {
+    expr->accept(*this);
+    return m_str;
+  }
+
+  std::string format(std::vector<StmtPtr> const &stmts) {
+    for (auto const &stmt : stmts) {
+      stmt->accept(*this);
+      m_str += "\n";
+    }
+    return m_str;
+  }
+
   void print(Expr const *expr) {
     expr->accept(*this);
 
     fmt::println("{}", m_str);
+  }
+
+  void print(std::vector<StmtPtr> const &stmts) {
+    for (auto const &stmt : stmts) {
+      stmt->accept(*this);
+      fmt::println("{}\n", m_str);
+    }
   }
 
   void visit(Binary const &expr) override {
@@ -127,6 +149,8 @@ public:
   void visit(Nil const &expr) override { m_str.append("NIL"sv); }
   void visit(Expression const &expr) override { ; }
   void visit(Print const &expr) override { ; }
+  void visit(Var const &expr) override { ; }
+  void visit(Variable const &expr) override { ; }
 
 private:
   std::string m_str{""};
@@ -141,6 +165,7 @@ public:
     m_tokens.clear();
     m_current_expr = expression();
     if (m_tokens.back().type != Token::Type::END_OF_FILE) {
+      m_tokens.emplace_back(Token::Type::SEMICOLON);
       m_tokens.emplace_back(Token::Type::END_OF_FILE);
     }
     m_current_result =
@@ -446,7 +471,7 @@ Catch::Generators::GeneratorWrapper<ExprResult> expression(int max_depth = 50) {
 } // namespace
 
 TEST_CASE("Test ExprGenerator Distribution", "[Generators]") {
-  SKIP();//Dialed in the ~ number to reliably generate everything
+  SKIP(); // Dialed in the ~ number to reliably generate everything
   static Counter overall_counter{};
   SECTION("Generate Expressions") {
     ExprResult result_tpl = GENERATE(take(10000, expression()));
@@ -475,9 +500,10 @@ TEST_CASE("Parse generated expressions", "[Parser]") {
 
   REQUIRE(result);
   fmt::println("Parsed Expression:");
-  Printer{}.print(result.value().get());
+  Printer{}.print(result.value());
 
-  REQUIRE(expected_ast.equals(*result.value().get()));
+  REQUIRE(expected_ast.equals(
+      *stmt_as<Expression>(*result.value().front()).expr.get()));
 }
 
 TEST_CASE("Parser handles syntax errors", "[Parser]") {
@@ -488,7 +514,7 @@ TEST_CASE("Parser handles syntax errors", "[Parser]") {
   Parser parser(tokens);
 
   auto result = parser.parse();
-  REQUIRE_FALSE(result.has_value());
+  REQUIRE(parser.hasError());
   // REQUIRE(result.error().code() == Error::Type::SyntaxError);
 }
 
@@ -497,6 +523,7 @@ TEST_CASE("Parser handles empty input", "[Parser]") {
   Parser parser(tokens);
 
   auto result = parser.parse();
-  REQUIRE_FALSE(result.has_value());
+  REQUIRE(result.has_value());
+  REQUIRE(result.value().empty());
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)

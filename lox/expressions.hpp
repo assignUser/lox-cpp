@@ -1,56 +1,41 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX - License - Identifier : Apache - 2.0
 //
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 
 #pragma once
+#include <algorithm>
+#include <iterator>
 #include <memory>
+#include <ranges>
+#include <stdexcept>
+#include <utility>
 
 #include <fmt/format.h>
+#include <vector>
 
+#include "lox/fwd.hpp"
 #include "lox/token.hpp"
-
-class Binary;
-class Grouping;
-class String;
-class Number;
-class Boolean;
-class Nil;
-class Unary;
-class Expr;
-using ExprPtr = std::unique_ptr<Expr>;
-
-class Stmt;
-class Expression;
-class Print;
-using StmtPtr = std::unique_ptr<Stmt>;
-
-class Visitor {
-public:
-  virtual ~Visitor() = default;
-
-  virtual void visit(Binary const &expr) = 0;
-  virtual void visit(Grouping const &expr) = 0;
-  virtual void visit(String const &expr) = 0;
-  virtual void visit(Number const &expr) = 0;
-  virtual void visit(Boolean const &expr) = 0;
-  virtual void visit(Nil const &expr) = 0;
-  virtual void visit(Unary const &expr) = 0;
-  virtual void visit(Expression const &stmt) = 0;
-  virtual void visit(Print const &stmt) = 0;
-
-protected:
-  Visitor() = default;
-  Visitor(const Visitor &) = default;
-  Visitor(Visitor &&) = default;
-  Visitor &operator=(const Visitor &) = default;
-  Visitor &operator=(Visitor &&) = default;
-};
 
 class Expr {
 public:
-  enum class ExprKind { Binary, Boolean, Grouping, Nil, Number, String, Unary };
+  enum class ExprKind {
+    Assign,
+    Binary,
+    Boolean,
+    Call,
+    Grouping,
+    NativeFunction,
+    Nil,
+    Number,
+    String,
+    Unary,
+    Variable,
+    Function,
+  };
 
   explicit Expr(ExprKind kind) : m_kind(kind) {}
+  Expr &operator=(const Expr &) = delete;
+  Expr(const Expr &) = delete;
 
   virtual ~Expr() = default;
   virtual void accept(Visitor &visitor) const = 0;
@@ -58,11 +43,10 @@ public:
   [[nodiscard]] virtual bool equals(Expr const &other) const = 0;
   [[nodiscard]] ExprKind getKind() const { return m_kind; }
   [[nodiscard]] virtual bool truthy() const { return true; }
+  [[nodiscard]] virtual bool isCallable() const { return false; }
 
 protected:
-  Expr(const Expr &) = default;
   Expr(Expr &&) = default;
-  Expr &operator=(const Expr &) = default;
   Expr &operator=(Expr &&) = default;
 
 private:
@@ -70,14 +54,17 @@ private:
 };
 
 // detail namespace?
-const static std::map<Expr::ExprKind, std::string_view> expr_kind_literals{
+const static std::unordered_map<Expr::ExprKind, std::string_view> expr_kind_literals{
     {Expr::ExprKind::Binary, "Binary"},
     {Expr::ExprKind::Boolean, "Boolean"},
     {Expr::ExprKind::Grouping, "Grouping"},
     {Expr::ExprKind::Nil, "Nil"},
+    {Expr::ExprKind::NativeFunction, "NativeFunction"},
     {Expr::ExprKind::Number, "Number"},
     {Expr::ExprKind::String, "String"},
     {Expr::ExprKind::Unary, "Unary"},
+    {Expr::ExprKind::Variable, "Variable"},
+    {Expr::ExprKind::Assign, "Assign"},
 };
 
 template <>
@@ -87,7 +74,8 @@ struct fmt::formatter<Expr::ExprKind> : fmt::formatter<std::string_view> {
   }
 };
 
-template <typename Derived> [[nodiscard]] bool isA(Expr const &expr) {
+template <typename Derived, typename Base>
+[[nodiscard]] bool isA(Base const &expr) {
   return Derived::classof(expr);
 }
 
@@ -98,11 +86,17 @@ template <typename AsType> AsType const &expr_as(const Expr &expr) {
   return static_cast<AsType const &>(expr);
 }
 
+template <typename AsType> AsType const &stmt_as(const Stmt &stmt) {
+  if (not isA<AsType>(stmt)) {
+    throw std::runtime_error{"stmt is not off matching type"};
+  }
+  return static_cast<AsType const &>(stmt);
+}
+
 class Binary : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr>
-  make(std::unique_ptr<Expr> lhs, Token op, std::unique_ptr<Expr> rhs) {
-    return std::unique_ptr<Expr>(
+  [[nodiscard]] static ExprPtr make(ExprPtr lhs, Token op, ExprPtr rhs) {
+    return std::shared_ptr<Expr>(
         new Binary{std::move(lhs), std::move(op), std::move(rhs)});
   }
 
@@ -120,20 +114,20 @@ public:
     return expr.getKind() == Expr::ExprKind::Binary;
   }
 
-  std::unique_ptr<Expr> lhs;
-  std::unique_ptr<Expr> rhs;
+  ExprPtr lhs;
+  ExprPtr rhs;
   Token op;
 
 private:
-  Binary(std::unique_ptr<Expr> lhs, Token op, std::unique_ptr<Expr> rhs)
+  Binary(ExprPtr lhs, Token op, ExprPtr rhs)
       : Expr(ExprKind::Binary), lhs{std::move(lhs)}, op{std::move(op)},
         rhs{std::move(rhs)} {}
 };
 
 class Grouping : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(std::unique_ptr<Expr> expr) {
-    return std::unique_ptr<Expr>(new Grouping{std::move(expr)});
+  [[nodiscard]] static ExprPtr make(ExprPtr expr) {
+    return std::shared_ptr<Expr>(new Grouping{std::move(expr)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -146,17 +140,18 @@ public:
     return expr.getKind() == Expr::ExprKind::Grouping;
   }
   [[nodiscard]] bool truthy() const override { return expr->truthy(); }
-  std::unique_ptr<Expr> expr;
+
+  ExprPtr expr;
 
 private:
-  explicit Grouping(std::unique_ptr<Expr> expr)
+  explicit Grouping(ExprPtr expr)
       : Expr(ExprKind::Grouping), expr{std::move(expr)} {}
 };
 
 class String : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(std::string value) {
-    return std::unique_ptr<Expr>(new String{std::move(value)});
+  [[nodiscard]] static ExprPtr make(std::string value) {
+    return std::shared_ptr<Expr>(new String{std::move(value)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -168,6 +163,7 @@ public:
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::String;
   }
+
   std::string value;
 
 private:
@@ -177,8 +173,8 @@ private:
 
 class Number : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(double value) {
-    return std::unique_ptr<Expr>(new Number{value});
+  [[nodiscard]] static ExprPtr make(double value) {
+    return std::shared_ptr<Expr>(new Number{value});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -190,6 +186,7 @@ public:
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Number;
   }
+
   double value;
 
 private:
@@ -198,8 +195,8 @@ private:
 
 class Boolean : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(bool value) {
-    return std::unique_ptr<Expr>(new Boolean{value});
+  [[nodiscard]] static ExprPtr make(bool value) {
+    return std::shared_ptr<Expr>(new Boolean{value});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -221,8 +218,8 @@ private:
 
 class Nil : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make() {
-    return std::unique_ptr<Expr>(new Nil{});
+  [[nodiscard]] static ExprPtr make() {
+    return std::shared_ptr<Expr>(new Nil{});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
 
@@ -243,9 +240,8 @@ private:
 
 class Unary : public Expr {
 public:
-  [[nodiscard]] static std::unique_ptr<Expr> make(Token op,
-                                                  std::unique_ptr<Expr> expr) {
-    return std::unique_ptr<Expr>(new Unary{std::move(op), std::move(expr)});
+  [[nodiscard]] static ExprPtr make(Token op, ExprPtr expr) {
+    return ExprPtr(new Unary{std::move(op), std::move(expr)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   [[nodiscard]] bool equals(Expr const &other) const override {
@@ -259,64 +255,100 @@ public:
   }
 
   Token op;
-  std::unique_ptr<Expr> expr;
+  ExprPtr expr;
 
 private:
-  Unary(Token op, std::unique_ptr<Expr> expr)
+  Unary(Token op, ExprPtr expr)
       : Expr(ExprKind::Unary), op{std::move(op)}, expr{std::move(expr)} {}
 };
 
-class Stmt {
+class Variable : public Expr {
 public:
-  enum class StmtKind { Expression, Print };
+  [[nodiscard]] static ExprPtr make(Token name) {
+    if (name.type != Token::Type::IDENTIFIER) {
+      throw "Tried to create Variable with non IDENTIFIER token.";
+    }
 
-  Stmt(const Stmt &) = default;
-  Stmt(Stmt &&) = delete;
-  Stmt &operator=(const Stmt &) = default;
-  Stmt &operator=(Stmt &&) = delete;
-  explicit Stmt(StmtKind kind) : m_kind(kind) {}
+    return std::shared_ptr<Expr>(new Variable{std::move(name)});
+  }
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    if (not isA<Variable>(other)) {
+      return false;
+    }
+    return name.lexem == expr_as<Variable>(other).name.lexem;
+  }
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Variable;
+  }
 
-  virtual ~Stmt() = default;
-  virtual void accept(Visitor &visitor) const = 0;
-  // [[nodiscard]] virtual bool equals(Stmt const &other) const = 0;
-  [[nodiscard]] StmtKind getKind() const { return m_kind; }
+  Token name;
 
 private:
-  StmtKind m_kind;
+  explicit Variable(Token name)
+      : Expr(ExprKind::Variable), name{std::move(name)} {}
 };
 
-const static std::map<Stmt::StmtKind, std::string_view> stmt_kind_literals{
-    {Stmt::StmtKind::Expression, "Expression"},
-    {Stmt::StmtKind::Print, "Print"},
-};
-
-template <>
-struct fmt::formatter<Stmt::StmtKind> : fmt::formatter<std::string_view> {
-  auto format(const Stmt::StmtKind &e, format_context &ctx) const {
-    return formatter<std::string_view>::format(stmt_kind_literals.at(e), ctx);
-  }
-};
-
-class Expression : public Stmt {
+class Assign : public Expr {
 public:
-  explicit Expression(ExprPtr expr)
-      : Stmt(Stmt::StmtKind::Expression), expression{std::move(expr)} {}
+  [[nodiscard]] static ExprPtr make(Token name, ExprPtr value) {
+    if (name.type != Token::Type::IDENTIFIER) {
+      throw "Tried to create Assign with non IDENTIFIER token.";
+    }
+
+    return std::shared_ptr<Expr>(new Assign{std::move(name), std::move(value)});
+  }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
-  static bool classof(const Stmt &stmt) {
-    return stmt.getKind() == Stmt::StmtKind::Expression;
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    if (not isA<Assign>(other)) {
+      return false;
+    }
+    return name.lexem == expr_as<Assign>(other).name.lexem and
+           value->equals(other);
+  }
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Assign;
   }
 
-  ExprPtr expression;
+  Token name;
+  ExprPtr value;
+
+private:
+  explicit Assign(Token name, ExprPtr value)
+      : Expr(ExprKind::Assign), name{std::move(name)}, value{std::move(value)} {
+  }
 };
 
-class Print : public Stmt {
+class Call : public Expr {
 public:
-  explicit Print(ExprPtr expr)
-      : Stmt(Stmt::StmtKind::Print), expression{std::move(expr)} {}
+  [[nodiscard]] static ExprPtr make(ExprPtr callee, Token paren,
+                                    std::vector<ExprPtr> arguments) {
+    return std::shared_ptr<Expr>(
+        new Call{std::move(callee), std::move(paren), std::move(arguments)});
+  }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
-  static bool classof(const Stmt &stmt) {
-    return stmt.getKind() == Stmt::StmtKind::Print;
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    if (not isA<Call>(other)) {
+      return false;
+    }
+
+    return paren.type == expr_as<Call>(other).paren.type and
+           callee->equals(*expr_as<Call>(other).callee.get()) and
+           std::ranges::equal(arguments, expr_as<Call>(other).arguments,
+                              [](ExprPtr const &a, ExprPtr const &b) {
+                                return a->equals(*b.get());
+                              });
+  }
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Call;
   }
 
-  ExprPtr expression;
+  ExprPtr callee;
+  Token paren;
+  std::vector<ExprPtr> arguments;
+
+private:
+  explicit Call(ExprPtr callee, Token paren, std::vector<ExprPtr> arguments)
+      : Expr(ExprKind::Call), callee{std::move(callee)},
+        paren{std::move(paren)}, arguments{std::move(arguments)} {}
 };

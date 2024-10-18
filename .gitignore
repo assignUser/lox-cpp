@@ -34,3 +34,4 @@ build
 .cache
 .ccache
 Testing/Temporary
+.gdb_history
