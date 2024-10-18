@@ -31,6 +31,8 @@ jobs:
           key: ccache-linux
 
       - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '2.12.0'
 
       - name: Build
         run: cmake --workflow --preset ci
