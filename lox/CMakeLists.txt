@@ -86,7 +86,7 @@ if(NOT ${dart_bin} STREQUAL dart_bin-NOTFOUND)
 
   add_test(
     NAME lox-validation
-    COMMAND ${dart_bin} tool/bin/test.dart chap11_resolving -i ${lox_BINARY_DIR}/lox/lox
+    COMMAND ${dart_bin} tool/bin/test.dart chap12_classes -i ${lox_BINARY_DIR}/lox/lox
     WORKING_DIRECTORY ${lox_tests_SOURCE_DIR})
 endif()
 
