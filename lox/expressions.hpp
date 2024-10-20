@@ -23,6 +23,7 @@ public:
     Binary,
     Boolean,
     Call,
+    Class,
     Grouping,
     NativeFunction,
     Nil,
@@ -54,18 +55,19 @@ private:
 };
 
 // detail namespace?
-const static std::unordered_map<Expr::ExprKind, std::string_view> expr_kind_literals{
-    {Expr::ExprKind::Binary, "Binary"},
-    {Expr::ExprKind::Boolean, "Boolean"},
-    {Expr::ExprKind::Grouping, "Grouping"},
-    {Expr::ExprKind::Nil, "Nil"},
-    {Expr::ExprKind::NativeFunction, "NativeFunction"},
-    {Expr::ExprKind::Number, "Number"},
-    {Expr::ExprKind::String, "String"},
-    {Expr::ExprKind::Unary, "Unary"},
-    {Expr::ExprKind::Variable, "Variable"},
-    {Expr::ExprKind::Assign, "Assign"},
-};
+const static std::unordered_map<Expr::ExprKind, std::string_view>
+    expr_kind_literals{
+        {Expr::ExprKind::Binary, "Binary"},
+        {Expr::ExprKind::Boolean, "Boolean"},
+        {Expr::ExprKind::Grouping, "Grouping"},
+        {Expr::ExprKind::Nil, "Nil"},
+        {Expr::ExprKind::NativeFunction, "NativeFunction"},
+        {Expr::ExprKind::Number, "Number"},
+        {Expr::ExprKind::String, "String"},
+        {Expr::ExprKind::Unary, "Unary"},
+        {Expr::ExprKind::Variable, "Variable"},
+        {Expr::ExprKind::Assign, "Assign"},
+    };
 
 template <>
 struct fmt::formatter<Expr::ExprKind> : fmt::formatter<std::string_view> {

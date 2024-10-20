@@ -6,6 +6,7 @@
 
 #include <tl/optional.hpp>
 #include <utility>
+#include <vector>
 
 #include "lox/env.hpp"
 #include "lox/expressions.hpp"
@@ -15,6 +16,7 @@ class Stmt {
 public:
   enum class StmtKind {
     Block,
+    Class,
     Expression,
     FunctionStmt,
     If,
@@ -40,15 +42,16 @@ private:
   StmtKind m_kind;
 };
 
-const static std::unordered_map<Stmt::StmtKind, std::string_view> stmt_kind_literals{
-    {Stmt::StmtKind::Block, "Block"},
-    {Stmt::StmtKind::Expression, "Expression"},
-    {Stmt::StmtKind::FunctionStmt, "FunctionStmt"},
-    {Stmt::StmtKind::If, "If"},
-    {Stmt::StmtKind::Print, "Print"},
-    {Stmt::StmtKind::Var, "Var"},
-    {Stmt::StmtKind::While, "While"},
-};
+const static std::unordered_map<Stmt::StmtKind, std::string_view>
+    stmt_kind_literals{
+        {Stmt::StmtKind::Block, "Block"},
+        {Stmt::StmtKind::Expression, "Expression"},
+        {Stmt::StmtKind::FunctionStmt, "FunctionStmt"},
+        {Stmt::StmtKind::If, "If"},
+        {Stmt::StmtKind::Print, "Print"},
+        {Stmt::StmtKind::Var, "Var"},
+        {Stmt::StmtKind::While, "While"},
+    };
 
 template <>
 struct fmt::formatter<Stmt::StmtKind> : fmt::formatter<std::string_view> {
@@ -218,6 +221,27 @@ private:
         params{std::move(params)}, body{std::move(body)} {}
 };
 
+class Class : public Stmt {
+public:
+  [[nodiscard]] static StmtPtr make(Token name, std::vector<StmtPtr> methods) {
+    return std::shared_ptr<Stmt>(
+        new Class(std::move(name), std::move(methods)));
+  }
+
+  Token name;
+  std::vector<StmtPtr> methods{};
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  static bool classof(const Stmt &stmt) {
+    return stmt.getKind() == Stmt::StmtKind::Class;
+  }
+
+private:
+  [[nodiscard]] Class(Token name, std::vector<StmtPtr> methods)
+      : Stmt(StmtKind::Class), name{std::move(name)},
+        methods{std::move(methods)} {}
+};
+
 class Callable {
 public:
   Callable() = default;
@@ -285,4 +309,17 @@ public:
 
 protected:
   explicit NativeFunction() : Expr(ExprKind::NativeFunction), Callable() {}
+};
+
+class LoxClass : public Expr {
+public:
+  // [[nodiscard]] size_t arity() const noexcept override { return 0; }
+  // void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Class;
+  }
+  std::string name{};
+
+  explicit LoxClass(std::string name)
+      : name{std::move(name)}, Expr(ExprKind::Class) {}
 };

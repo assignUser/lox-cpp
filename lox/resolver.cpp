@@ -56,7 +56,7 @@ void Resolver::declare(Token const &name) {
   if (m_scopes.back().contains(name.lexem)) {
     had_error = true;
     report(Error{name.line, fmt::format("at '{}'", name.lexem),
-            "Already a variable with this name in this scope."});
+                 "Already a variable with this name in this scope."});
   }
 
   m_scopes.back().insert_or_assign(name.lexem, false);
@@ -89,7 +89,7 @@ void Resolver::visit(Variable const &expr) {
       not m_scopes.back()[expr.name.lexem]) {
     had_error = true;
     report(Error{expr.name.line, fmt::format("at '{}'", expr.name.lexem),
-            "Can't read local variable in its own initializer."});
+                 "Can't read local variable in its own initializer."});
   }
 
   resolveLocal(&expr, expr.name);
@@ -121,7 +121,7 @@ void Resolver::visit(Return const &stmt) {
   if (m_currentFunction == FunctionType::NONE) {
     had_error = true;
     report(Error{stmt.keyword.line, fmt::format("at '{}'", stmt.keyword.lexem),
-            "Can't return from top-level code."});
+                 "Can't return from top-level code."});
   }
 
   if (stmt.value) {
@@ -150,3 +150,8 @@ void Resolver::visit(Call const &expr) {
 void Resolver::visit(Grouping const &expr) { resolve(expr.expr.get()); }
 
 void Resolver::visit(Unary const &expr) { resolve(expr.expr.get()); }
+
+void Resolver::visit(Class const &stmt) {
+  declare(stmt.name);
+  define(stmt.name);
+}

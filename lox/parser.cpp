@@ -87,7 +87,9 @@ tl::expected<std::vector<StmtPtr>, Error> Parser::parse() {
 // ast
 StmtPtr Parser::declaration() {
   try {
-    if (match(Token::Type::VAR)) {
+    if (match(Token::Type::CLASS)) {
+      return classDeclaration();
+    } else if (match(Token::Type::VAR)) {
       return varDeclaration();
     } else if (match(Token::Type::FUN)) {
       return function("function");
@@ -101,6 +103,22 @@ StmtPtr Parser::declaration() {
     return Expression::make(Nil::make());
   }
 }
+
+StmtPtr Parser::classDeclaration(){
+  Token name = consume(Token::Type::IDENTIFIER, "Expect class name.");
+  consume(Token::Type::LEFT_BRACE, "Expect '{' before class body.");
+
+  std::vector<StmtPtr> methods{};
+  
+  while(not check(Token::Type::RIGHT_BRACE) and not atEnd()){
+    methods.push_back(function("method"));
+  }
+
+  consume(Token::Type::RIGHT_BRACE, "Expect '}' after class body.");
+
+  return Class::make(std::move(name), std::move(methods));
+}
+
 StmtPtr Parser::function(std::string const &kind) {
   Token name =
       consume(Token::Type::IDENTIFIER, fmt::format("Expect {} name.", kind));

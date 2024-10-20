@@ -34,6 +34,7 @@ private:
   void synchronize();
   // ast
   StmtPtr varDeclaration();
+  StmtPtr classDeclaration();
   StmtPtr declaration();
   StmtPtr function(std::string const &kind);
   StmtPtr statement();

@@ -52,6 +52,7 @@ public:
   void visit(Print const &stmt) override;
   void visit(Var const &stmt) override;
   void visit(Block const &stmt) override;
+  void visit(Class const &stmt) override;
   void visit(If const &stmt) override;
   void visit(While const &stmt) override;
   void visit(Return const &stmt) override;
@@ -77,7 +78,7 @@ private:
   public:
     explicit Context(Interpreter &interp) : Context(interp, tl::nullopt) {}
     Context(Interpreter &interp,
-            tl::optional<std::shared_ptr<Environment>> parent)
+            const tl::optional<std::shared_ptr<Environment>>& parent)
         // Following the recursive approach in the book, an iterative approach
         // would make this easier and faster
         : m_interp{interp}, m_previous(interp.m_env) {

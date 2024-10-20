@@ -230,7 +230,9 @@ void Interpreter::visit(Print const &stmt) {
                                 .name.lexem);
   } else if (isA<NativeFunction>(*m_result)) {
     fmt::println("<native fn>");
-  } else {
+  } else if(isA<LoxClass>(*m_result)){
+    fmt::println("{}", expr_as<LoxClass>(*m_result).name);
+  }else {
     throw RuntimeError{
         Token{Token::Type::NIL, "", "", 0},
         fmt::format("Unexpected result type {}.", m_result->getKind())};
@@ -322,7 +324,8 @@ void Interpreter::visit(Call const &expr) {
 
 void Interpreter::visit(Function const &expr) { ; }
 void Interpreter::visit(FunctionStmt const &stmt) {
-  m_env->define(stmt.name.lexem, Function::make(std::make_shared<FunctionStmt>(stmt), m_env));
+  m_env->define(stmt.name.lexem,
+                Function::make(std::make_shared<FunctionStmt>(stmt), m_env));
 }
 
 void Interpreter::visit(Return const &stmt) {
@@ -332,4 +335,10 @@ void Interpreter::visit(Return const &stmt) {
   std::swap(m_result, value);
 
   throw Return::make(stmt.keyword, value);
+}
+
+void Interpreter::visit(Class const &stmt) {
+  // Allow references to the class inside it's methods
+  m_env->define(stmt.name.lexem, Nil::make());
+
 }
