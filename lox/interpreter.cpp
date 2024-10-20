@@ -109,36 +109,36 @@ void Interpreter::visit(Binary const &expr) {
   if (isA<Number>(*lhs) and isA<Number>(*rhs)) {
     switch (expr.op.type) {
     case Token::Type::MINUS:
-      m_result = Number::make(expr_as<Number>(*lhs).value -
-                              expr_as<Number>(*rhs).value);
+      m_result = Number::make(asA<Number>(*lhs).value -
+                              asA<Number>(*rhs).value);
       break;
     case Token::Type::SLASH:
-      m_result = Number::make(expr_as<Number>(*lhs).value /
-                              expr_as<Number>(*rhs).value);
+      m_result = Number::make(asA<Number>(*lhs).value /
+                              asA<Number>(*rhs).value);
       break;
     case Token::Type::STAR:
-      m_result = Number::make(expr_as<Number>(*lhs).value *
-                              expr_as<Number>(*rhs).value);
+      m_result = Number::make(asA<Number>(*lhs).value *
+                              asA<Number>(*rhs).value);
       break;
     case Token::Type::PLUS:
-      m_result = Number::make(expr_as<Number>(*lhs).value +
-                              expr_as<Number>(*rhs).value);
+      m_result = Number::make(asA<Number>(*lhs).value +
+                              asA<Number>(*rhs).value);
       break;
     case Token::Type::GREATER:
-      m_result = Boolean::make(expr_as<Number>(*lhs).value >
-                               expr_as<Number>(*rhs).value);
+      m_result = Boolean::make(asA<Number>(*lhs).value >
+                               asA<Number>(*rhs).value);
       break;
     case Token::Type::GREATER_EQUAL:
-      m_result = Boolean::make(expr_as<Number>(*lhs).value >=
-                               expr_as<Number>(*rhs).value);
+      m_result = Boolean::make(asA<Number>(*lhs).value >=
+                               asA<Number>(*rhs).value);
       break;
     case Token::Type::LESS:
-      m_result = Boolean::make(expr_as<Number>(*lhs).value <
-                               expr_as<Number>(*rhs).value);
+      m_result = Boolean::make(asA<Number>(*lhs).value <
+                               asA<Number>(*rhs).value);
       break;
     case Token::Type::LESS_EQUAL:
-      m_result = Boolean::make(expr_as<Number>(*lhs).value <=
-                               expr_as<Number>(*rhs).value);
+      m_result = Boolean::make(asA<Number>(*lhs).value <=
+                               asA<Number>(*rhs).value);
       break;
     default:
       throw RuntimeError{expr.op,
@@ -151,8 +151,8 @@ void Interpreter::visit(Binary const &expr) {
 
   if (isA<String>(*lhs) and isA<String>(*rhs)) {
     if (expr.op.type == Token::Type::PLUS) {
-      m_result = String::make(expr_as<String>(*lhs).value +
-                              expr_as<String>(*rhs).value);
+      m_result = String::make(asA<String>(*lhs).value +
+                              asA<String>(*rhs).value);
       return;
     } else {
       throw RuntimeError{expr.op,
@@ -193,7 +193,7 @@ void Interpreter::visit(Unary const &expr) {
 
   if (expr.op.type == Token::Type::MINUS) {
     if (isA<Number>(*rhs)) {
-      m_result = Number::make(-expr_as<Number>(*rhs).value);
+      m_result = Number::make(-asA<Number>(*rhs).value);
     } else {
       throw RuntimeError{
           expr.op,
@@ -217,21 +217,21 @@ void Interpreter::visit(Expression const &stmt) { evaluate(stmt.expr.get()); }
 void Interpreter::visit(Print const &stmt) {
   evaluate(stmt.expr.get());
   if (isA<String>(*m_result)) {
-    fmt::println("{}", expr_as<String>(*m_result).value);
+    fmt::println("{}", asA<String>(*m_result).value);
   } else if (isA<Number>(*m_result)) {
-    fmt::println("{}", expr_as<Number>(*m_result).value);
+    fmt::println("{}", asA<Number>(*m_result).value);
   } else if (isA<Boolean>(*m_result)) {
-    fmt::println("{}", expr_as<Boolean>(*m_result).value);
+    fmt::println("{}", asA<Boolean>(*m_result).value);
   } else if (isA<Nil>(*m_result)) {
     fmt::println("nil");
   } else if (isA<Function>(*m_result)) {
-    fmt::println("<fn {}>", stmt_as<FunctionStmt>(
-                                *expr_as<Function>(*m_result).declaration)
+    fmt::println("<fn {}>", asA<FunctionStmt>(
+                                *asA<Function>(*m_result).declaration)
                                 .name.lexem);
   } else if (isA<NativeFunction>(*m_result)) {
     fmt::println("<native fn>");
   } else if(isA<LoxClass>(*m_result)){
-    fmt::println("{}", expr_as<LoxClass>(*m_result).name);
+    fmt::println("{}", asA<LoxClass>(*m_result).name);
   }else {
     throw RuntimeError{
         Token{Token::Type::NIL, "", "", 0},

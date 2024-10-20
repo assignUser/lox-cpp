@@ -273,13 +273,13 @@ public:
       return false;
     }
 
-    return stmt_as<FunctionStmt>(*declaration).name.lexem ==
-           stmt_as<FunctionStmt>(*expr_as<Function>(other).declaration)
+    return asA<FunctionStmt>(*declaration).name.lexem ==
+           asA<FunctionStmt>(*asA<Function>(other).declaration)
                .name.lexem;
   }
   ExprPtr call(Interpreter &interpret, std::vector<ExprPtr> arguments) override;
   [[nodiscard]] size_t arity() const noexcept override {
-    return stmt_as<FunctionStmt>(*declaration).params.size();
+    return asA<FunctionStmt>(*declaration).params.size();
   }
 
   // TODO should this be a std::unique<FunctionStmt> ?

@@ -52,7 +52,7 @@ TEST_CASE("Unary", "[interpreter]") {
 
     ExprPtr result_false = lox.interpret(not_true.get());
     REQUIRE(not lox.hasError());
-    REQUIRE_FALSE(expr_as<Boolean>(*result_false.get()).value);
+    REQUIRE_FALSE(asA<Boolean>(*result_false.get()).value);
   }
 
   SECTION("!false") {
@@ -62,7 +62,7 @@ TEST_CASE("Unary", "[interpreter]") {
 
     ExprPtr result_true = lox.interpret(not_false.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Boolean>(*result_true.get()).value);
+    REQUIRE(asA<Boolean>(*result_true.get()).value);
   }
 
   SECTION("!(!false)") {
@@ -73,7 +73,7 @@ TEST_CASE("Unary", "[interpreter]") {
 
     ExprPtr result_false = lox.interpret(not_group.get());
     REQUIRE(not lox.hasError());
-    REQUIRE_FALSE(expr_as<Boolean>(*result_false.get()).value);
+    REQUIRE_FALSE(asA<Boolean>(*result_false.get()).value);
   }
 
   SECTION("!!false") {
@@ -84,7 +84,7 @@ TEST_CASE("Unary", "[interpreter]") {
 
     ExprPtr result_true = lox.interpret(not_not_false.get());
     REQUIRE(not lox.hasError());
-    REQUIRE_FALSE(expr_as<Boolean>(*result_true.get()).value);
+    REQUIRE_FALSE(asA<Boolean>(*result_true.get()).value);
   }
 
   SECTION("-Double") {
@@ -93,7 +93,7 @@ TEST_CASE("Unary", "[interpreter]") {
 
     ExprPtr result_negative = lox.interpret(negative_number.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Number>(*result_negative.get()).value == -5.5);
+    REQUIRE(asA<Number>(*result_negative.get()).value == -5.5);
   }
 
   SECTION("--Double") {
@@ -104,7 +104,7 @@ TEST_CASE("Unary", "[interpreter]") {
 
     ExprPtr result_positive = lox.interpret(positive_number.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Number>(*result_positive.get()).value == 5.5);
+    REQUIRE(asA<Number>(*result_positive.get()).value == 5.5);
   }
 
   SECTION("Error") {
@@ -136,7 +136,7 @@ TEST_CASE("Binary", "[interpreter]") {
         Binary::make(num_big(), Token{Token::Type::GREATER}, num_small());
     ExprPtr result = lox.interpret(gt_true.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number > Number - false") {
@@ -145,7 +145,7 @@ TEST_CASE("Binary", "[interpreter]") {
         Binary::make(num_zero(), Token{Token::Type::GREATER}, num_small());
     ExprPtr result = lox.interpret(gt_false.get());
     REQUIRE(not lox.hasError());
-    REQUIRE_FALSE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE_FALSE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number >= Number - true") {
@@ -154,7 +154,7 @@ TEST_CASE("Binary", "[interpreter]") {
         Binary::make(num_big(), Token{Token::Type::GREATER_EQUAL}, num_big());
     ExprPtr result = lox.interpret(gte_true.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number >= Number - false") {
@@ -163,7 +163,7 @@ TEST_CASE("Binary", "[interpreter]") {
         num_zero(), Token{Token::Type::GREATER_EQUAL}, num_small());
     ExprPtr result = lox.interpret(gte_false.get());
     REQUIRE(not lox.hasError());
-    REQUIRE_FALSE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE_FALSE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number < Number - true") {
@@ -172,7 +172,7 @@ TEST_CASE("Binary", "[interpreter]") {
         Binary::make(num_zero(), Token{Token::Type::LESS}, num_small());
     ExprPtr result = lox.interpret(lt_true.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number < Number - false") {
@@ -181,7 +181,7 @@ TEST_CASE("Binary", "[interpreter]") {
         Binary::make(num_big(), Token{Token::Type::LESS}, num_small());
     ExprPtr result = lox.interpret(lt_false.get());
     REQUIRE(not lox.hasError());
-    REQUIRE_FALSE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE_FALSE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number <= Number - true") {
@@ -190,7 +190,7 @@ TEST_CASE("Binary", "[interpreter]") {
         Binary::make(num_big(), Token{Token::Type::LESS_EQUAL}, num_big());
     ExprPtr result = lox.interpret(lte_true.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number <= Number - false") {
@@ -199,7 +199,7 @@ TEST_CASE("Binary", "[interpreter]") {
         Binary::make(num_big(), Token{Token::Type::LESS_EQUAL}, num_small());
     ExprPtr result = lox.interpret(lte_false.get());
     REQUIRE(not lox.hasError());
-    REQUIRE_FALSE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE_FALSE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number - Number") {
@@ -208,7 +208,7 @@ TEST_CASE("Binary", "[interpreter]") {
         Binary::make(num_small(), Token{Token::Type::MINUS}, num_small());
     ExprPtr result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Number>(*result.get()).value == 0.0);
+    REQUIRE(asA<Number>(*result.get()).value == 0.0);
   }
 
   SECTION("Number + Number") {
@@ -217,7 +217,7 @@ TEST_CASE("Binary", "[interpreter]") {
                                 Number::make(1.5));
     ExprPtr result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Number>(*result.get()).value == 5);
+    REQUIRE(asA<Number>(*result.get()).value == 5);
   }
 
   SECTION("Number / Number") {
@@ -226,7 +226,7 @@ TEST_CASE("Binary", "[interpreter]") {
                                 Number::make(2));
     ExprPtr result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Number>(*result.get()).value == 3.3);
+    REQUIRE(asA<Number>(*result.get()).value == 3.3);
   }
 
   SECTION("Number * Number") {
@@ -235,7 +235,7 @@ TEST_CASE("Binary", "[interpreter]") {
                                 Number::make(2));
     ExprPtr result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Number>(*result.get()).value == 13.2);
+    REQUIRE(asA<Number>(*result.get()).value == 13.2);
   }
 
   SECTION("Number == Number - true") {
@@ -244,7 +244,7 @@ TEST_CASE("Binary", "[interpreter]") {
         Number::make(2), Token{Token::Type::EQUAL_EQUAL}, Number::make(2));
     ExprPtr result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number == Number - false") {
@@ -253,7 +253,7 @@ TEST_CASE("Binary", "[interpreter]") {
         Number::make(6), Token{Token::Type::EQUAL_EQUAL}, Number::make(2));
     ExprPtr result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
-    REQUIRE_FALSE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE_FALSE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number != Number - true") {
@@ -262,7 +262,7 @@ TEST_CASE("Binary", "[interpreter]") {
                                 Number::make(2));
     ExprPtr result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
-    REQUIRE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number != Number - false") {
@@ -271,7 +271,7 @@ TEST_CASE("Binary", "[interpreter]") {
                                 Number::make(2));
     ExprPtr result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
-    REQUIRE_FALSE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE_FALSE(asA<Boolean>(*result.get()).value);
   }
 
   SECTION("Number == String - false") {
@@ -283,7 +283,7 @@ TEST_CASE("Binary", "[interpreter]") {
                      String::make("a string"));
     ExprPtr result = lox.interpret(expr.get());
     REQUIRE(not lox.hasError());
-    REQUIRE_FALSE(expr_as<Boolean>(*result.get()).value);
+    REQUIRE_FALSE(asA<Boolean>(*result.get()).value);
   }
 }
 
@@ -295,7 +295,7 @@ TEST_CASE("Binary Grouping", "[interpreter]") {
   ExprPtr result = lox.interpret(expr.get());
   REQUIRE(not lox.hasError());
   REQUIRE(isA<Number>(*result.get()));
-  REQUIRE(expr_as<Number>(*result.get()).value == 25);
+  REQUIRE(asA<Number>(*result.get()).value == 25);
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)

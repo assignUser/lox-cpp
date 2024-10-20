@@ -8,6 +8,7 @@
 #include <memory>
 #include <ranges>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 #include <fmt/format.h>
@@ -81,18 +82,17 @@ template <typename Derived, typename Base>
   return Derived::classof(expr);
 }
 
-template <typename AsType> AsType const &expr_as(const Expr &expr) {
-  if (not isA<AsType>(expr)) {
-    throw std::runtime_error{"expr is not off matching type"};
-  }
-  return static_cast<AsType const &>(expr);
-}
+template <typename AsType, typename FromType>
+std::enable_if_t<std::disjunction_v<std::is_base_of<Expr, FromType>,
+                                  std::is_base_of<Stmt, FromType>>,
+               AsType const &>
+asA(const FromType &from) {
 
-template <typename AsType> AsType const &stmt_as(const Stmt &stmt) {
-  if (not isA<AsType>(stmt)) {
-    throw std::runtime_error{"stmt is not off matching type"};
+  if (not isA<AsType>(from)) {
+    throw std::runtime_error{"FromType is not off matching type."};
   }
-  return static_cast<AsType const &>(stmt);
+
+  return static_cast<AsType const &>(from);
 }
 
 class Binary : public Expr {
@@ -107,7 +107,7 @@ public:
     if (not isA<Binary>(other)) {
       return false;
     }
-    auto const &other_bin = expr_as<Binary>(other);
+    auto const &other_bin = asA<Binary>(other);
     return lhs->equals(*other_bin.lhs) and op.type == other_bin.op.type &&
            rhs->equals(*other_bin.rhs);
   }
@@ -136,7 +136,7 @@ public:
     if (not isA<Grouping>(other)) {
       return false;
     }
-    return expr->equals(*expr_as<Grouping>(other).expr);
+    return expr->equals(*asA<Grouping>(other).expr);
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Grouping;
@@ -160,7 +160,7 @@ public:
     if (not isA<String>(other)) {
       return false;
     }
-    return value == expr_as<String>(other).value;
+    return value == asA<String>(other).value;
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::String;
@@ -183,7 +183,7 @@ public:
     if (not isA<Number>(other)) {
       return false;
     }
-    return value == expr_as<Number>(other).value;
+    return value == asA<Number>(other).value;
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Number;
@@ -205,7 +205,7 @@ public:
     if (not isA<Boolean>(other)) {
       return false;
     }
-    return value == expr_as<Boolean>(other).value;
+    return value == asA<Boolean>(other).value;
   }
   [[nodiscard]] bool truthy() const override { return value; }
   static bool classof(const Expr &expr) {
@@ -250,7 +250,7 @@ public:
     if (not isA<Unary>(other)) {
       return false;
     }
-    return expr->equals(*expr_as<Unary>(other).expr);
+    return expr->equals(*asA<Unary>(other).expr);
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Unary;
@@ -278,7 +278,7 @@ public:
     if (not isA<Variable>(other)) {
       return false;
     }
-    return name.lexem == expr_as<Variable>(other).name.lexem;
+    return name.lexem == asA<Variable>(other).name.lexem;
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Variable;
@@ -305,8 +305,7 @@ public:
     if (not isA<Assign>(other)) {
       return false;
     }
-    return name.lexem == expr_as<Assign>(other).name.lexem and
-           value->equals(other);
+    return name.lexem == asA<Assign>(other).name.lexem and value->equals(other);
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Assign;
@@ -334,9 +333,9 @@ public:
       return false;
     }
 
-    return paren.type == expr_as<Call>(other).paren.type and
-           callee->equals(*expr_as<Call>(other).callee.get()) and
-           std::ranges::equal(arguments, expr_as<Call>(other).arguments,
+    return paren.type == asA<Call>(other).paren.type and
+           callee->equals(*asA<Call>(other).callee.get()) and
+           std::ranges::equal(arguments, asA<Call>(other).arguments,
                               [](ExprPtr const &a, ExprPtr const &b) {
                                 return a->equals(*b.get());
                               });

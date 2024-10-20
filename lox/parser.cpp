@@ -306,7 +306,7 @@ ExprPtr Parser::assignment() {
     ExprPtr value = assignment();
 
     if (isA<Variable>(*expr.get())) {
-      Token name = expr_as<Variable>(*expr.get()).name;
+      Token name = asA<Variable>(*expr.get()).name;
       return Assign::make(name, std::move(value));
     }
     m_hasError = true;
