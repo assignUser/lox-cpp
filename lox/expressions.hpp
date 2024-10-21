@@ -4,6 +4,7 @@
 
 #pragma once
 #include <algorithm>
+#include <concepts>
 #include <iterator>
 #include <memory>
 #include <ranges>
@@ -78,15 +79,15 @@ struct fmt::formatter<Expr::ExprKind> : fmt::formatter<std::string_view> {
 };
 
 template <typename Derived, typename Base>
+  requires std::derived_from<Derived, Base>
 [[nodiscard]] bool isA(Base const &expr) {
   return Derived::classof(expr);
 }
 
 template <typename AsType, typename FromType>
-std::enable_if_t<std::disjunction_v<std::is_base_of<Expr, FromType>,
-                                  std::is_base_of<Stmt, FromType>>,
-               AsType const &>
-asA(const FromType &from) {
+  requires(std::derived_from<FromType, Expr> or
+           std::derived_from<Stmt, FromType>)
+AsType const &asA(const FromType &from) {
 
   if (not isA<AsType>(from)) {
     throw std::runtime_error{"FromType is not off matching type."};
