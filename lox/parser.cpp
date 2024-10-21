@@ -104,13 +104,13 @@ StmtPtr Parser::declaration() {
   }
 }
 
-StmtPtr Parser::classDeclaration(){
+StmtPtr Parser::classDeclaration() {
   Token name = consume(Token::Type::IDENTIFIER, "Expect class name.");
   consume(Token::Type::LEFT_BRACE, "Expect '{' before class body.");
 
   std::vector<StmtPtr> methods{};
-  
-  while(not check(Token::Type::RIGHT_BRACE) and not atEnd()){
+
+  while (not check(Token::Type::RIGHT_BRACE) and not atEnd()) {
     methods.push_back(function("method"));
   }
 
@@ -308,6 +308,9 @@ ExprPtr Parser::assignment() {
     if (isA<Variable>(*expr.get())) {
       Token name = asA<Variable>(*expr.get()).name;
       return Assign::make(name, std::move(value));
+    } else if (isA<Get>(*expr.get())) {
+      Get const &get = asA<Get>(*expr);
+      return Set::make( get.name, get.object, std::move(value));
     }
     m_hasError = true;
     // casting to void explicitly disables the `[[nodiscard]]` warning
@@ -408,6 +411,10 @@ ExprPtr Parser::call() {
   while (true) {
     if (match(Token::Type::LEFT_PAREN)) {
       expr = finishCall(std::move(expr));
+    } else if (match(Token::Type::DOT)) {
+      Token name =
+          consume(Token::Type::IDENTIFIER, "Expect property name after '.'.");
+      expr = Get::make(name, expr);
     } else {
       break;
     }

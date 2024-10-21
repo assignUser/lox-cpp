@@ -104,7 +104,7 @@ void Resolver::visit(FunctionStmt const &stmt) {
   declare(stmt.name);
   define(stmt.name);
 
-  resolveFunction(stmt, FunctionType::FUNCTION);
+  resolveFunction(stmt, FunctionType::Function);
 }
 
 void Resolver::visit(Expression const &stmt) { resolve(stmt.expr.get()); }
@@ -118,7 +118,7 @@ void Resolver::visit(If const &stmt) {
 void Resolver::visit(Print const &stmt) { resolve(stmt.expr.get()); }
 
 void Resolver::visit(Return const &stmt) {
-  if (m_currentFunction == FunctionType::NONE) {
+  if (m_currentFunction == FunctionType::None) {
     had_error = true;
     report(Error{stmt.keyword.line, fmt::format("at '{}'", stmt.keyword.lexem),
                  "Can't return from top-level code."});
@@ -154,4 +154,15 @@ void Resolver::visit(Unary const &expr) { resolve(expr.expr.get()); }
 void Resolver::visit(Class const &stmt) {
   declare(stmt.name);
   define(stmt.name);
+
+  for (auto &method : stmt.methods){
+    FunctionType declaration = FunctionType::Method;
+    resolveFunction(asA<FunctionStmt>(*method), declaration);
+  }
+}
+
+void Resolver::visit(Get const &expr) { resolve(expr.object.get()); }
+void Resolver::visit(Set const &expr) {
+  resolve(expr.value.get());
+  resolve(expr.object.get());
 }

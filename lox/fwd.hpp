@@ -26,6 +26,9 @@ class Variable;
 class Function;
 class NativeFunction;
 class LoxClass;
+class LoxInstance;
+class Get;
+class Set;
 using ExprPtr = std::shared_ptr<Expr>;
 
 // Statements
@@ -62,7 +65,11 @@ public:
   virtual void visit(Assign const &expr) = 0;
   virtual void visit(Call const &expr) = 0;
   virtual void visit(Function const &expr) = 0;
-  virtual void visit(NativeFunction const &expr){};
+  virtual void visit(NativeFunction const &expr) = 0;
+  virtual void visit(LoxClass const &expr) = 0;
+  virtual void visit(LoxInstance const &expr) = 0;
+  virtual void visit(Get const &expr) = 0;
+  virtual void visit(Set const &expr) = 0;
   // Statements
   virtual void visit(Expression const &stmt) = 0;
   virtual void visit(Print const &stmt) = 0;

@@ -26,9 +26,7 @@ private:
   [[nodiscard]] bool check(Token::Type type) const;
   Token const &consume(Token::Type type, std::string const &message);
   Error error(Token const &token, std::string const &message);
-  template <typename... TokenTs>
-    requires(std::same_as<Token::Type, TokenTs> and ...)
-  bool match(TokenTs... type) {
+  bool match(std::same_as<Token::Type> auto... type) {
     return (... || (check(type) ? advance(), true : false));
   }
   [[nodiscard]] Token const &peek() const;

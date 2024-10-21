@@ -26,11 +26,14 @@ public:
     Boolean,
     Call,
     Class,
+    Get,
     Grouping,
+    Instance,
     NativeFunction,
     Nil,
     Number,
     String,
+    Set,
     Unary,
     Variable,
     Function,
@@ -353,4 +356,67 @@ private:
   explicit Call(ExprPtr callee, Token paren, std::vector<ExprPtr> arguments)
       : Expr(ExprKind::Call), callee{std::move(callee)},
         paren{std::move(paren)}, arguments{std::move(arguments)} {}
+};
+
+class Get : public Expr {
+public:
+  [[nodiscard]] static ExprPtr make(Token name, ExprPtr object) {
+    if (name.type != Token::Type::IDENTIFIER) {
+      throw "Tried to create Get with non IDENTIFIER token.";
+    }
+
+    return std::shared_ptr<Expr>(new Get{std::move(name), std::move(object)});
+  }
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    if (not isA<Get>(other)) {
+      return false;
+    }
+    return name.lexem == asA<Get>(other).name.lexem and object->equals(other);
+  }
+
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Get;
+  }
+
+  Token name;
+  ExprPtr object;
+
+private:
+  explicit Get(Token name, ExprPtr object)
+      : Expr(ExprKind::Get), name{std::move(name)}, object{std::move(object)} {}
+};
+
+class Set : public Expr {
+public:
+  [[nodiscard]] static ExprPtr make(Token name, ExprPtr object, ExprPtr value) {
+    if (name.type != Token::Type::IDENTIFIER) {
+      throw "Tried to create Set with non IDENTIFIER token.";
+    }
+
+    return std::shared_ptr<Expr>(
+        new Set{std::move(name), std::move(object), std::move(value)});
+  }
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    if (not isA<Set>(other)) {
+      return false;
+    }
+    return name.lexem == asA<Set>(other).name.lexem and object->equals(other) and value->equals(other);
+  }
+
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Set;
+  }
+
+  Token name;
+  ExprPtr object;
+  ExprPtr value;
+
+private:
+  Set(Token name, ExprPtr object, ExprPtr value)
+      : Expr(ExprKind::Set), name{std::move(name)}, object{std::move(object)},
+        value{std::move(value)} {}
 };

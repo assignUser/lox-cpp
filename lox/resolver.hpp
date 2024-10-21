@@ -29,6 +29,10 @@ public:
   void visit(Call const &expr) override;
   void visit(Function const &expr) override {}
   void visit(NativeFunction const &expr) override {}
+  void visit(LoxClass const &expr) override {};
+  void visit(LoxInstance const &expr) override {};
+  void visit(Get const &expr) override;
+  void visit(Set const &expr) override;
   // Statements
   void visit(Expression const &stmt) override;
   void visit(Print const &stmt) override;
@@ -43,7 +47,7 @@ public:
   bool had_error{false};
 
 private:
-  enum class FunctionType { NONE, FUNCTION };
+  enum class FunctionType { None, Function, Method};
   void resolve(Expr const *expr);
   void resolve(Stmt const *stmt);
   void resolveLocal(Expr const *const expr, Token const &name);
@@ -55,5 +59,5 @@ private:
   void define(Token const &name);
   Interpreter &m_interp;
   ScopeStack m_scopes{};
-  FunctionType m_currentFunction = FunctionType::NONE;
+  FunctionType m_currentFunction = FunctionType::None;
 };
