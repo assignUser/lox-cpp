@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #pragma once
 
-#include <unordered_map>
 #include <stack>
+#include <unordered_map>
 #include <vector>
 
 #include "lox/fwd.hpp"
@@ -29,10 +29,11 @@ public:
   void visit(Call const &expr) override;
   void visit(Function const &expr) override {}
   void visit(NativeFunction const &expr) override {}
-  void visit(LoxClass const &expr) override {};
-  void visit(LoxInstance const &expr) override {};
+  void visit(LoxClass const &expr) override{};
+  void visit(LoxInstance const &expr) override{};
   void visit(Get const &expr) override;
   void visit(Set const &expr) override;
+  void visit(This const &expr) override;
   // Statements
   void visit(Expression const &stmt) override;
   void visit(Print const &stmt) override;
@@ -47,17 +48,22 @@ public:
   bool had_error{false};
 
 private:
-  enum class FunctionType { None, Function, Method};
+  enum class FunctionType { None, Function, Method };
+  enum class ClassType {None, Class};
+
   void resolve(Expr const *expr);
   void resolve(Stmt const *stmt);
   void resolveLocal(Expr const *const expr, Token const &name);
-  void resolveFunction(FunctionStmt const &function, FunctionType function_type);
+  void resolveFunction(FunctionStmt const &function,
+                       FunctionType function_type);
   void beginScope() { m_scopes.emplace_back(); }
   void endScope() { m_scopes.pop_back(); }
 
   void declare(Token const &name);
   void define(Token const &name);
+
   Interpreter &m_interp;
   ScopeStack m_scopes{};
-  FunctionType m_currentFunction = FunctionType::None;
+  FunctionType m_currentFunction{FunctionType::None};
+  ClassType m_currentClass{ClassType::None};
 };

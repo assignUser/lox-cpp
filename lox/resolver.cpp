@@ -152,17 +152,35 @@ void Resolver::visit(Grouping const &expr) { resolve(expr.expr.get()); }
 void Resolver::visit(Unary const &expr) { resolve(expr.expr.get()); }
 
 void Resolver::visit(Class const &stmt) {
+  ClassType enclosing_class = m_currentClass;
+  m_currentClass = ClassType::Class;
+
   declare(stmt.name);
   define(stmt.name);
 
-  for (auto &method : stmt.methods){
+  beginScope();
+  m_scopes.back().insert_or_assign("this", true);
+
+  for (auto &method : stmt.methods) {
     FunctionType declaration = FunctionType::Method;
     resolveFunction(asA<FunctionStmt>(*method), declaration);
   }
+
+  endScope();
+  m_currentClass = enclosing_class;
 }
 
 void Resolver::visit(Get const &expr) { resolve(expr.object.get()); }
 void Resolver::visit(Set const &expr) {
   resolve(expr.value.get());
   resolve(expr.object.get());
+}
+
+void Resolver::visit(This const &expr) {
+if(m_currentClass == ClassType::None){
+    had_error = true;
+    report(Error{expr.keyword.line, fmt::format("at '{}'", expr.keyword.lexem),
+                 "Can't use 'this' outside of a class."});
+  }
+  resolveLocal(&expr, expr.keyword); 
 }

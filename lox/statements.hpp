@@ -274,12 +274,20 @@ public:
       return false;
     }
 
-    return asA<FunctionStmt>(*declaration).name.lexem ==
-           asA<FunctionStmt>(*asA<Function>(other).declaration).name.lexem;
+    return asA<FunctionStmt const>(*declaration).name.lexem ==
+               asA<FunctionStmt const>(*asA<Function const>(other).declaration)
+                   .name.lexem and
+           m_closure == asA<Function const>(other).m_closure;
   }
   ExprPtr call(Interpreter &interpret, std::vector<ExprPtr> arguments) override;
   [[nodiscard]] size_t arity() const noexcept override {
-    return asA<FunctionStmt>(*declaration).params.size();
+    return asA<FunctionStmt const>(*declaration).params.size();
+  }
+
+  ExprPtr bind(ExprPtr instance) {
+    auto env = std::make_shared<Environment>(m_closure);
+    env->define("this", std::move(instance));
+    return Function::make(declaration, env);
   }
 
   // TODO should this be a std::unique<FunctionStmt> ?
@@ -336,7 +344,7 @@ public:
       return false;
     }
 
-    return asA<LoxClass>(other).name == name;
+    return asA<LoxClass const>(other).name == name;
   }
 
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
@@ -362,7 +370,10 @@ public:
     m_fields.insert_or_assign(name.lexem, value);
   }
   [[nodiscard]] static ExprPtr make(LoxClass &klass) {
-    return ExprPtr(new LoxInstance{klass});
+    auto instance = ExprPtr(new LoxInstance{klass});
+    // This is required to properly bind methods to the instance
+    asA<LoxInstance>(*instance).m_this = instance;
+    return std::move(instance);
   }
 
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
@@ -371,7 +382,7 @@ public:
       return false;
     }
 
-    return m_class.name == asA<LoxInstance>(other).m_class.name;
+    return m_class.name == asA<LoxInstance const>(other).m_class.name;
   }
 
   static bool classof(const Expr &expr) {
@@ -381,6 +392,7 @@ public:
 
 private:
   LoxClass &m_class;
+  std::weak_ptr<Expr> m_this;
   std::unordered_map<std::string, ExprPtr> m_fields{};
   explicit LoxInstance(LoxClass &klass)
       : Expr(ExprKind::Instance), m_class{klass} {}

@@ -377,3 +377,8 @@ void Interpreter::visit(Set const &expr) {
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
   const_cast<LoxInstance &>(asA<LoxInstance>(*object)).set(expr.name, m_result);
 }
+
+void Interpreter::visit(This const &expr){
+  lookUpVariable(expr.keyword, &expr);
+}
+

@@ -34,6 +34,7 @@ public:
     Number,
     String,
     Set,
+    This,
     Unary,
     Variable,
     Function,
@@ -90,13 +91,13 @@ template <typename Derived, typename Base>
 template <typename AsType, typename FromType>
   requires(std::derived_from<FromType, Expr> or
            std::derived_from<Stmt, FromType>)
-AsType const &asA(const FromType &from) {
+AsType &asA(FromType &from) {
 
   if (not isA<AsType>(from)) {
     throw std::runtime_error{"FromType is not off matching type."};
   }
 
-  return static_cast<AsType const &>(from);
+  return static_cast<AsType &>(from);
 }
 
 class Binary : public Expr {
@@ -111,7 +112,7 @@ public:
     if (not isA<Binary>(other)) {
       return false;
     }
-    auto const &other_bin = asA<Binary>(other);
+    auto const &other_bin = asA<Binary const>(other);
     return lhs->equals(*other_bin.lhs) and op.type == other_bin.op.type &&
            rhs->equals(*other_bin.rhs);
   }
@@ -140,7 +141,7 @@ public:
     if (not isA<Grouping>(other)) {
       return false;
     }
-    return expr->equals(*asA<Grouping>(other).expr);
+    return expr->equals(*asA<Grouping const>(other).expr);
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Grouping;
@@ -164,7 +165,7 @@ public:
     if (not isA<String>(other)) {
       return false;
     }
-    return value == asA<String>(other).value;
+    return value == asA<String const>(other).value;
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::String;
@@ -187,7 +188,7 @@ public:
     if (not isA<Number>(other)) {
       return false;
     }
-    return value == asA<Number>(other).value;
+    return value == asA<Number const>(other).value;
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Number;
@@ -209,7 +210,7 @@ public:
     if (not isA<Boolean>(other)) {
       return false;
     }
-    return value == asA<Boolean>(other).value;
+    return value == asA<Boolean const>(other).value;
   }
   [[nodiscard]] bool truthy() const override { return value; }
   static bool classof(const Expr &expr) {
@@ -254,7 +255,7 @@ public:
     if (not isA<Unary>(other)) {
       return false;
     }
-    return expr->equals(*asA<Unary>(other).expr);
+    return expr->equals(*asA<Unary const>(other).expr);
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Unary;
@@ -282,7 +283,7 @@ public:
     if (not isA<Variable>(other)) {
       return false;
     }
-    return name.lexem == asA<Variable>(other).name.lexem;
+    return name.lexem == asA<Variable const>(other).name.lexem;
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Variable;
@@ -309,7 +310,7 @@ public:
     if (not isA<Assign>(other)) {
       return false;
     }
-    return name.lexem == asA<Assign>(other).name.lexem and value->equals(other);
+    return name.lexem == asA<Assign const>(other).name.lexem and value->equals(other);
   }
   static bool classof(const Expr &expr) {
     return expr.getKind() == Expr::ExprKind::Assign;
@@ -337,9 +338,9 @@ public:
       return false;
     }
 
-    return paren.type == asA<Call>(other).paren.type and
-           callee->equals(*asA<Call>(other).callee.get()) and
-           std::ranges::equal(arguments, asA<Call>(other).arguments,
+    return paren.type == asA<Call const>(other).paren.type and
+           callee->equals(*asA<Call const>(other).callee.get()) and
+           std::ranges::equal(arguments, asA<Call const>(other).arguments,
                               [](ExprPtr const &a, ExprPtr const &b) {
                                 return a->equals(*b.get());
                               });
@@ -373,7 +374,7 @@ public:
     if (not isA<Get>(other)) {
       return false;
     }
-    return name.lexem == asA<Get>(other).name.lexem and object->equals(other);
+    return name.lexem == asA<Get const>(other).name.lexem and object->equals(other);
   }
 
   static bool classof(const Expr &expr) {
@@ -404,7 +405,8 @@ public:
     if (not isA<Set>(other)) {
       return false;
     }
-    return name.lexem == asA<Set>(other).name.lexem and object->equals(other) and value->equals(other);
+    return name.lexem == asA<Set const>(other).name.lexem and
+           object->equals(other) and value->equals(other);
   }
 
   static bool classof(const Expr &expr) {
@@ -419,4 +421,30 @@ private:
   Set(Token name, ExprPtr object, ExprPtr value)
       : Expr(ExprKind::Set), name{std::move(name)}, object{std::move(object)},
         value{std::move(value)} {}
+};
+
+class This : public Expr {
+public:
+  [[nodiscard]] static ExprPtr make(Token keyword) {
+    if (keyword.type != Token::Type::THIS) {
+      throw "Tried to create This with non THIs token.";
+    }
+
+    return std::shared_ptr<Expr>(new This{std::move(keyword)});
+  }
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    return isA<This>(other);
+  }
+
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::This;
+  }
+
+  Token keyword;
+
+private:
+  explicit This(Token keyword)
+      : Expr(ExprKind::This), keyword{std::move(keyword)} {}
 };

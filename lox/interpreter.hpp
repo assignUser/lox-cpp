@@ -52,6 +52,7 @@ public:
   void visit(LoxInstance const &expr) override {};
   void visit(Get const &expr) override;
   void visit(Set const &expr) override;
+  void visit(This const &expr) override;
   // statements
   void visit(Expression const &stmt) override;
   void visit(Print const &stmt) override;

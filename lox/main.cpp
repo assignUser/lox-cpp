@@ -111,6 +111,7 @@ tl::expected<int, Error> run(std::string_view source) {
 
   if (resolver.had_error){
     // Don't run interpreter on input with resolver error.
+    // For some reason the book/test expect exit code 0
     return 65;
   }
   

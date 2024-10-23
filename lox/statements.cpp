@@ -37,12 +37,15 @@ ExprPtr LoxClass::call(Interpreter &interpreter,
   if (m_fields.contains(name.lexem)) {
     return m_fields.at(name.lexem);
   }
-  
+
   tl::optional<ExprPtr> method = m_class.findMethod(name.lexem);
 
-  if(method) {
-    return method.value();
+  if (method) {
+    if (m_this.expired()) {
+      throw RuntimeError(name, "Invalid m_this on instance.");
+    }
+    return asA<Function>(**method).bind(m_this.lock());
   }
 
-  throw RuntimeError{name, fmt::format("Undefined proeprty '{}'.", name.lexem)};
+  throw RuntimeError{name, fmt::format("Undefined property '{}'.", name.lexem)};
 }

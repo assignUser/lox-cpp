@@ -310,7 +310,7 @@ ExprPtr Parser::assignment() {
       return Assign::make(name, std::move(value));
     } else if (isA<Get>(*expr.get())) {
       Get const &get = asA<Get>(*expr);
-      return Set::make( get.name, get.object, std::move(value));
+      return Set::make(get.name, get.object, std::move(value));
     }
     m_hasError = true;
     // casting to void explicitly disables the `[[nodiscard]]` warning
@@ -459,6 +459,8 @@ ExprPtr Parser::primary() {
     return String::make(std::get<std::string>(previous().literal));
   } else if (match(Token::Type::NUMBER)) {
     return Number::make(std::get<double>(previous().literal));
+  } else if (match(Token::Type::THIS)) {
+    return This::make(previous());
   } else if (match(Token::Type::IDENTIFIER)) {
     return Variable::make(previous());
   } else if (match(Token::Type::LEFT_PAREN)) {
