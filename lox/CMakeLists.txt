@@ -74,6 +74,7 @@ target_link_libraries(
           tl::optional
           bfg::lyra)
 
+# requires dart >= 2.11 <3.0.0
 find_program(dart_bin dart)
 if(NOT ${dart_bin} STREQUAL dart_bin-NOTFOUND)
   add_custom_command(

@@ -5,6 +5,6 @@ BasedOnStyle: Google
 DerivePointerAlignment: false
 QualifierAlignment: Right
 ColumnLimit: 100
-IncludeBlocks:: Preserve
+IncludeBlocks: Preserve
 BreakTemplateDeclarations: Yes
 BreakAfterReturnType: All 
