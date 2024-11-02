@@ -124,9 +124,16 @@ void Resolver::visit(Return const &stmt) {
                  "Can't return from top-level code."});
   }
 
-  if (stmt.value) {
-    resolve(stmt.value.get());
+  if (not isA<Nil>(*stmt.value)) {
+    if (m_currentFunction == FunctionType::Initializer) {
+      had_error = true;
+      report(Error{stmt.keyword.line,
+                   fmt::format("at '{}'", stmt.keyword.lexem),
+                   "Can't return a value from an initializer."});
+    }
   }
+
+  resolve(stmt.value.get());
 }
 
 void Resolver::visit(While const &stmt) {
@@ -161,9 +168,13 @@ void Resolver::visit(Class const &stmt) {
   beginScope();
   m_scopes.back().insert_or_assign("this", true);
 
-  for (auto &method : stmt.methods) {
-    FunctionType declaration = FunctionType::Method;
-    resolveFunction(asA<FunctionStmt>(*method), declaration);
+  for (auto &method_ptr : stmt.methods) {
+    auto &method = asA<FunctionStmt>(*method_ptr);
+    FunctionType declaration = method.name.lexem == "init"
+                                   ? FunctionType::Initializer
+                                   : FunctionType::Method;
+
+    resolveFunction(method, declaration);
   }
 
   endScope();
@@ -177,10 +188,10 @@ void Resolver::visit(Set const &expr) {
 }
 
 void Resolver::visit(This const &expr) {
-if(m_currentClass == ClassType::None){
+  if (m_currentClass == ClassType::None) {
     had_error = true;
     report(Error{expr.keyword.line, fmt::format("at '{}'", expr.keyword.lexem),
                  "Can't use 'this' outside of a class."});
   }
-  resolveLocal(&expr, expr.keyword); 
+  resolveLocal(&expr, expr.keyword);
 }

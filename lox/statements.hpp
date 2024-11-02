@@ -260,9 +260,10 @@ public:
 class Function : public Expr, public Callable {
 public:
   [[nodiscard]] static ExprPtr make(StmtPtr declaration,
-                                    std::shared_ptr<Environment> closure) {
+                                    std::shared_ptr<Environment> closure,
+                                    bool is_initializer = false) {
     return std::shared_ptr<Function>(
-        new Function(std::move(declaration), std::move(closure)));
+        new Function(std::move(declaration), std::move(closure), is_initializer));
   }
   [[nodiscard]] bool isCallable() const override { return true; }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
@@ -287,7 +288,7 @@ public:
   ExprPtr bind(ExprPtr instance) {
     auto env = std::make_shared<Environment>(m_closure);
     env->define("this", std::move(instance));
-    return Function::make(declaration, env);
+    return Function::make(declaration, env, m_isInitializer);
   }
 
   // TODO should this be a std::unique<FunctionStmt> ?
@@ -295,9 +296,12 @@ public:
 
 private:
   std::shared_ptr<Environment> m_closure;
+  bool m_isInitializer{false};
 
-  explicit Function(StmtPtr decl, std::shared_ptr<Environment> closure)
-      : Expr(ExprKind::Function), Callable(), m_closure{std::move(closure)} {
+  explicit Function(StmtPtr decl, std::shared_ptr<Environment> closure,
+                    bool is_initializer)
+      : Expr(ExprKind::Function), Callable(), m_closure{std::move(closure)},
+        m_isInitializer{is_initializer} {
     if (not isA<FunctionStmt>(*decl)) {
       throw std::runtime_error("Function declaration must be FunctionStmt.");
     }
@@ -326,6 +330,12 @@ public:
        std::unordered_map<std::string, ExprPtr> methods) {
     return std::shared_ptr<Expr>(new LoxClass(name, std::move(methods)));
   }
+
+  [[nodiscard]] tl::optional<ExprPtr>
+  findMethod(std::string const &name) const {
+    return (const_cast<LoxClass *>(this)->findMethod(name));
+  }
+
   [[nodiscard]] tl::optional<ExprPtr> findMethod(std::string const &name) {
     if (m_methods.contains(name)) {
       return m_methods[name];
@@ -333,7 +343,12 @@ public:
       return tl::nullopt;
     }
   }
-  [[nodiscard]] size_t arity() const noexcept override { return 0; }
+
+  [[nodiscard]] size_t arity() const noexcept override {
+    auto const &initializer = findMethod("init");
+    return initializer.map_or(
+        [&](ExprPtr const &init) { return asA<Function>(*init).arity(); }, 0);
+  }
 
   [[nodiscard]] bool isCallable() const override { return true; }
   ExprPtr call(Interpreter &interpreter,

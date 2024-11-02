@@ -6,10 +6,10 @@
 #include "lox/error.hpp"
 #include "lox/interpreter.hpp"
 
-ExprPtr Function::call(Interpreter &interpreter,
-                       std::vector<ExprPtr> arguments) {
+ExprPtr
+Function::call(Interpreter& interpreter, std::vector<ExprPtr> arguments) {
   auto env = std::make_shared<Environment>(m_closure);
-  auto const &decl = asA<FunctionStmt>(*declaration);
+  auto const& decl = asA<FunctionStmt>(*declaration);
 
   for (auto i{0}; i < decl.params.size(); ++i) {
     env->define(decl.params.at(i).lexem, std::move(arguments.at(i)));
@@ -17,23 +17,40 @@ ExprPtr Function::call(Interpreter &interpreter,
 
   try {
     interpreter.executeBlock(decl.body, env);
-  } catch (StmtPtr const &return_value) {
-    if (isA<Return>(*return_value)) {
-      return asA<Return>(*return_value).value;
-    } else {
+  } catch (StmtPtr const& return_value) {
+    if (not isA<Return>(*return_value)) {
       throw "Unexpected statement instead of Return.";
+    } else if (not m_isInitializer) {
+      return asA<Return>(*return_value).value;
     }
+  }
+
+  if (m_isInitializer) {
+    return m_closure->getAt({.type = Token::Type::THIS, .lexem = "this"}, 0);
   }
 
   return Nil::make();
 }
 
-ExprPtr LoxClass::call(Interpreter &interpreter,
-                       std::vector<ExprPtr> arguments) {
-  return LoxInstance::make(*this);
+ExprPtr
+LoxClass::call(Interpreter& interpreter, std::vector<ExprPtr> arguments) {
+  auto instance = LoxInstance::make(*this);
+  auto initializer_opt = findMethod("init");
+  if (initializer_opt) {
+    // using .map for method calls feels really clunky and all the shared_ptr
+    // don't make it look nicer
+    auto& initializer = asA<Function>(*initializer_opt.value());
+    // bind returns a ExprPtr that has to be preserved, just chaining would see it dtor'ed and
+    // lead to a segfault
+    ExprPtr init_ptr = initializer.bind(instance);
+    asA<Function>(*init_ptr).call(interpreter, std::move(arguments));
+  }
+
+  return std::move(instance);
 }
 
-[[nodiscard]] ExprPtr LoxInstance::get(Token const &name) const {
+[[nodiscard]] ExprPtr
+LoxInstance::get(Token const& name) const {
   if (m_fields.contains(name.lexem)) {
     return m_fields.at(name.lexem);
   }

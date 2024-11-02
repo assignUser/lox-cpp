@@ -48,7 +48,7 @@ public:
   bool had_error{false};
 
 private:
-  enum class FunctionType { None, Function, Method };
+  enum class FunctionType { None, Function, Method, Initializer };
   enum class ClassType {None, Class};
 
   void resolve(Expr const *expr);

@@ -345,8 +345,9 @@ void Interpreter::visit(Class const &stmt) {
 
   std::unordered_map<std::string, ExprPtr> methods{};
   for (auto const &method : stmt.methods) {
-    ExprPtr function = Function::make(method, m_env);
-    methods.insert_or_assign(asA<FunctionStmt>(*method).name.lexem, function);
+    ExprPtr function = Function::make(
+        method, m_env, asA<FunctionStmt>(*method).name.lexem == "init");
+    methods.insert_or_assign(asA<FunctionStmt>(*method).name.lexem, std::move(function));
   }
 
   ExprPtr klass = LoxClass::make(stmt.name.lexem, std::move(methods));
@@ -378,7 +379,6 @@ void Interpreter::visit(Set const &expr) {
   const_cast<LoxInstance &>(asA<LoxInstance>(*object)).set(expr.name, m_result);
 }
 
-void Interpreter::visit(This const &expr){
+void Interpreter::visit(This const &expr) {
   lookUpVariable(expr.keyword, &expr);
 }
-
