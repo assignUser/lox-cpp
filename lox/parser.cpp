@@ -196,7 +196,7 @@ StmtPtr Parser::ifStatement() {
   consume(Token::Type::RIGHT_PAREN, "Expect ')' after if condition.");
 
   StmtPtr then_branch = statement();
-  tl::optional<StmtPtr> else_branch = tl::nullopt;
+  MaybeStmt else_branch = tl::nullopt;
 
   if (match(Token::Type::ELSE)) {
     else_branch = statement();

@@ -55,7 +55,7 @@ LoxInstance::get(Token const& name) const {
     return m_fields.at(name.lexem);
   }
 
-  tl::optional<ExprPtr> method = m_class.findMethod(name.lexem);
+  MaybeExpr method = m_class.findMethod(name.lexem);
 
   if (method) {
     if (m_this.expired()) {
