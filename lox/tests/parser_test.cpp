@@ -503,7 +503,7 @@ TEST_CASE("Parse generated expressions", "[Parser]") {
   Printer{}.print(result.value());
 
   REQUIRE(expected_ast.equals(
-      *stmt_as<Expression>(*result.value().front()).expr.get()));
+      *asA<Expression>(*result.value().front()).expr.get()));
 }
 
 TEST_CASE("Parser handles syntax errors", "[Parser]") {

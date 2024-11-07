@@ -74,6 +74,7 @@ target_link_libraries(
           tl::optional
           bfg::lyra)
 
+# requires dart >= 2.11 <3.0.0
 find_program(dart_bin dart)
 if(NOT ${dart_bin} STREQUAL dart_bin-NOTFOUND)
   add_custom_command(
@@ -86,7 +87,7 @@ if(NOT ${dart_bin} STREQUAL dart_bin-NOTFOUND)
 
   add_test(
     NAME lox-validation
-    COMMAND ${dart_bin} tool/bin/test.dart chap11_resolving -i ${lox_BINARY_DIR}/lox/lox
+    COMMAND ${dart_bin} tool/bin/test.dart chap12_classes -i ${lox_BINARY_DIR}/lox/lox
     WORKING_DIRECTORY ${lox_tests_SOURCE_DIR})
 endif()
 

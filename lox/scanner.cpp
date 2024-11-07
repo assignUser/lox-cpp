@@ -8,7 +8,7 @@
 
 void Scanner::addToken(Token::Type type,
                        std::variant<std::string, double> const &literal) {
-  auto text{m_source.substr(m_start, m_current - m_start)};
+  std::string text{m_source.substr(m_start, m_current - m_start)};
   m_tokens.emplace_back(type, text, literal, m_line);
 }
 

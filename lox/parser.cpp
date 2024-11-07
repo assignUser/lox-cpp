@@ -87,7 +87,9 @@ tl::expected<std::vector<StmtPtr>, Error> Parser::parse() {
 // ast
 StmtPtr Parser::declaration() {
   try {
-    if (match(Token::Type::VAR)) {
+    if (match(Token::Type::CLASS)) {
+      return classDeclaration();
+    } else if (match(Token::Type::VAR)) {
       return varDeclaration();
     } else if (match(Token::Type::FUN)) {
       return function("function");
@@ -101,6 +103,22 @@ StmtPtr Parser::declaration() {
     return Expression::make(Nil::make());
   }
 }
+
+StmtPtr Parser::classDeclaration() {
+  Token name = consume(Token::Type::IDENTIFIER, "Expect class name.");
+  consume(Token::Type::LEFT_BRACE, "Expect '{' before class body.");
+
+  std::vector<StmtPtr> methods{};
+
+  while (not check(Token::Type::RIGHT_BRACE) and not atEnd()) {
+    methods.push_back(function("method"));
+  }
+
+  consume(Token::Type::RIGHT_BRACE, "Expect '}' after class body.");
+
+  return Class::make(std::move(name), std::move(methods));
+}
+
 StmtPtr Parser::function(std::string const &kind) {
   Token name =
       consume(Token::Type::IDENTIFIER, fmt::format("Expect {} name.", kind));
@@ -288,8 +306,11 @@ ExprPtr Parser::assignment() {
     ExprPtr value = assignment();
 
     if (isA<Variable>(*expr.get())) {
-      Token name = expr_as<Variable>(*expr.get()).name;
+      Token name = asA<Variable>(*expr.get()).name;
       return Assign::make(name, std::move(value));
+    } else if (isA<Get>(*expr.get())) {
+      Get const &get = asA<Get>(*expr);
+      return Set::make(get.name, get.object, std::move(value));
     }
     m_hasError = true;
     // casting to void explicitly disables the `[[nodiscard]]` warning
@@ -390,6 +411,10 @@ ExprPtr Parser::call() {
   while (true) {
     if (match(Token::Type::LEFT_PAREN)) {
       expr = finishCall(std::move(expr));
+    } else if (match(Token::Type::DOT)) {
+      Token name =
+          consume(Token::Type::IDENTIFIER, "Expect property name after '.'.");
+      expr = Get::make(name, expr);
     } else {
       break;
     }
@@ -434,6 +459,8 @@ ExprPtr Parser::primary() {
     return String::make(std::get<std::string>(previous().literal));
   } else if (match(Token::Type::NUMBER)) {
     return Number::make(std::get<double>(previous().literal));
+  } else if (match(Token::Type::THIS)) {
+    return This::make(previous());
   } else if (match(Token::Type::IDENTIFIER)) {
     return Variable::make(previous());
   } else if (match(Token::Type::LEFT_PAREN)) {

@@ -18,7 +18,7 @@ namespace lox_std {
 class Clock : public NativeFunction {
 public:
   [[nodiscard]] static ExprPtr make() {
-    return std::unique_ptr<Clock>(new Clock());
+    return std::shared_ptr<Clock>(new Clock());
   }
   [[nodiscard]] bool equals(Expr const &other) const override { return false; }
   [[nodiscard]] size_t arity() const noexcept override { return 0; };
@@ -109,36 +109,36 @@ void Interpreter::visit(Binary const &expr) {
   if (isA<Number>(*lhs) and isA<Number>(*rhs)) {
     switch (expr.op.type) {
     case Token::Type::MINUS:
-      m_result = Number::make(expr_as<Number>(*lhs).value -
-                              expr_as<Number>(*rhs).value);
+      m_result =
+          Number::make(asA<Number>(*lhs).value - asA<Number>(*rhs).value);
       break;
     case Token::Type::SLASH:
-      m_result = Number::make(expr_as<Number>(*lhs).value /
-                              expr_as<Number>(*rhs).value);
+      m_result =
+          Number::make(asA<Number>(*lhs).value / asA<Number>(*rhs).value);
       break;
     case Token::Type::STAR:
-      m_result = Number::make(expr_as<Number>(*lhs).value *
-                              expr_as<Number>(*rhs).value);
+      m_result =
+          Number::make(asA<Number>(*lhs).value * asA<Number>(*rhs).value);
       break;
     case Token::Type::PLUS:
-      m_result = Number::make(expr_as<Number>(*lhs).value +
-                              expr_as<Number>(*rhs).value);
+      m_result =
+          Number::make(asA<Number>(*lhs).value + asA<Number>(*rhs).value);
       break;
     case Token::Type::GREATER:
-      m_result = Boolean::make(expr_as<Number>(*lhs).value >
-                               expr_as<Number>(*rhs).value);
+      m_result =
+          Boolean::make(asA<Number>(*lhs).value > asA<Number>(*rhs).value);
       break;
     case Token::Type::GREATER_EQUAL:
-      m_result = Boolean::make(expr_as<Number>(*lhs).value >=
-                               expr_as<Number>(*rhs).value);
+      m_result =
+          Boolean::make(asA<Number>(*lhs).value >= asA<Number>(*rhs).value);
       break;
     case Token::Type::LESS:
-      m_result = Boolean::make(expr_as<Number>(*lhs).value <
-                               expr_as<Number>(*rhs).value);
+      m_result =
+          Boolean::make(asA<Number>(*lhs).value < asA<Number>(*rhs).value);
       break;
     case Token::Type::LESS_EQUAL:
-      m_result = Boolean::make(expr_as<Number>(*lhs).value <=
-                               expr_as<Number>(*rhs).value);
+      m_result =
+          Boolean::make(asA<Number>(*lhs).value <= asA<Number>(*rhs).value);
       break;
     default:
       throw RuntimeError{expr.op,
@@ -151,8 +151,8 @@ void Interpreter::visit(Binary const &expr) {
 
   if (isA<String>(*lhs) and isA<String>(*rhs)) {
     if (expr.op.type == Token::Type::PLUS) {
-      m_result = String::make(expr_as<String>(*lhs).value +
-                              expr_as<String>(*rhs).value);
+      m_result =
+          String::make(asA<String>(*lhs).value + asA<String>(*rhs).value);
       return;
     } else {
       throw RuntimeError{expr.op,
@@ -193,7 +193,7 @@ void Interpreter::visit(Unary const &expr) {
 
   if (expr.op.type == Token::Type::MINUS) {
     if (isA<Number>(*rhs)) {
-      m_result = Number::make(-expr_as<Number>(*rhs).value);
+      m_result = Number::make(-asA<Number>(*rhs).value);
     } else {
       throw RuntimeError{
           expr.op,
@@ -217,19 +217,23 @@ void Interpreter::visit(Expression const &stmt) { evaluate(stmt.expr.get()); }
 void Interpreter::visit(Print const &stmt) {
   evaluate(stmt.expr.get());
   if (isA<String>(*m_result)) {
-    fmt::println("{}", expr_as<String>(*m_result).value);
+    fmt::println("{}", asA<String>(*m_result).value);
   } else if (isA<Number>(*m_result)) {
-    fmt::println("{}", expr_as<Number>(*m_result).value);
+    fmt::println("{}", asA<Number>(*m_result).value);
   } else if (isA<Boolean>(*m_result)) {
-    fmt::println("{}", expr_as<Boolean>(*m_result).value);
+    fmt::println("{}", asA<Boolean>(*m_result).value);
   } else if (isA<Nil>(*m_result)) {
     fmt::println("nil");
   } else if (isA<Function>(*m_result)) {
-    fmt::println("<fn {}>", stmt_as<FunctionStmt>(
-                                *expr_as<Function>(*m_result).declaration)
-                                .name.lexem);
+    fmt::println(
+        "<fn {}>",
+        asA<FunctionStmt>(*asA<Function>(*m_result).declaration).name.lexem);
   } else if (isA<NativeFunction>(*m_result)) {
     fmt::println("<native fn>");
+  } else if (isA<LoxClass>(*m_result)) {
+    fmt::println("{}", asA<LoxClass>(*m_result).name);
+  } else if (isA<LoxInstance>(*m_result)) {
+    fmt::println("{}", static_cast<std::string>(asA<LoxInstance>(*m_result)));
   } else {
     throw RuntimeError{
         Token{Token::Type::NIL, "", "", 0},
@@ -271,8 +275,8 @@ void Interpreter::visit(Block const &stmt) {
 
 void Interpreter::executeBlock(
     std::vector<StmtPtr> const &statements,
-    tl::optional<std::shared_ptr<Environment>> parent_env) {
-  Context ctx{*this, std::move(parent_env)};
+    tl::optional<std::shared_ptr<Environment>> const &parent_env) {
+  Context ctx{*this, parent_env};
 
   for (auto const &stmt : statements) {
     ctx.execute(stmt.get());
@@ -322,7 +326,8 @@ void Interpreter::visit(Call const &expr) {
 
 void Interpreter::visit(Function const &expr) { ; }
 void Interpreter::visit(FunctionStmt const &stmt) {
-  m_env->define(stmt.name.lexem, Function::make(std::make_shared<FunctionStmt>(stmt), m_env));
+  m_env->define(stmt.name.lexem,
+                Function::make(std::make_shared<FunctionStmt>(stmt), m_env));
 }
 
 void Interpreter::visit(Return const &stmt) {
@@ -332,4 +337,48 @@ void Interpreter::visit(Return const &stmt) {
   std::swap(m_result, value);
 
   throw Return::make(stmt.keyword, value);
+}
+
+void Interpreter::visit(Class const &stmt) {
+  // Allow references to the class inside it's methods
+  m_env->define(stmt.name.lexem, Nil::make());
+
+  std::unordered_map<std::string, ExprPtr> methods{};
+  for (auto const &method : stmt.methods) {
+    ExprPtr function = Function::make(
+        method, m_env, asA<FunctionStmt>(*method).name.lexem == "init");
+    methods.insert_or_assign(asA<FunctionStmt>(*method).name.lexem, std::move(function));
+  }
+
+  ExprPtr klass = LoxClass::make(stmt.name.lexem, std::move(methods));
+  m_env->assign(stmt.name, klass);
+}
+
+void Interpreter::visit(Get const &expr) {
+  evaluate(expr.object.get());
+  if (isA<LoxInstance>(*m_result)) {
+    m_result = asA<LoxInstance>(*m_result).get(expr.name);
+    return;
+  }
+
+  throw RuntimeError{expr.name, "Only instances have properties."};
+}
+
+void Interpreter::visit(Set const &expr) {
+  evaluate(expr.object.get());
+  ExprPtr object = std::move(m_result);
+
+  if (not isA<LoxInstance>(*object)) {
+    throw RuntimeError(expr.name, "Only instances have fields.");
+  }
+
+  evaluate(expr.value.get());
+
+  // TODO: does this make sense or should the param model change?
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+  const_cast<LoxInstance &>(asA<LoxInstance>(*object)).set(expr.name, m_result);
+}
+
+void Interpreter::visit(This const &expr) {
+  lookUpVariable(expr.keyword, &expr);
 }

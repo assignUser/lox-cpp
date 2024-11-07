@@ -5,9 +5,9 @@
 
 #include <memory>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 #include <vector>
-#include <unordered_map>
 
 #include <tl/optional.hpp>
 
@@ -32,9 +32,9 @@ public:
     m_tmp.reset();
     m_hasError = false;
   }
-  void executeBlock(
-      std::vector<StmtPtr> const &statements,
-      tl::optional<std::shared_ptr<Environment>> parent_env = tl::nullopt);
+  void executeBlock(std::vector<StmtPtr> const &statements,
+                    tl::optional<std::shared_ptr<Environment>> const
+                        &parent_env = tl::nullopt);
 
   void visit(Binary const &expr) override;
   void visit(Boolean const &expr) override;
@@ -47,11 +47,18 @@ public:
   void visit(Assign const &expr) override;
   void visit(Call const &expr) override;
   void visit(Function const &expr) override;
+  void visit(NativeFunction const &expr) override{};
+  void visit(LoxClass const &expr) override{};
+  void visit(LoxInstance const &expr) override {};
+  void visit(Get const &expr) override;
+  void visit(Set const &expr) override;
+  void visit(This const &expr) override;
   // statements
   void visit(Expression const &stmt) override;
   void visit(Print const &stmt) override;
   void visit(Var const &stmt) override;
   void visit(Block const &stmt) override;
+  void visit(Class const &stmt) override;
   void visit(If const &stmt) override;
   void visit(While const &stmt) override;
   void visit(Return const &stmt) override;
@@ -77,7 +84,7 @@ private:
   public:
     explicit Context(Interpreter &interp) : Context(interp, tl::nullopt) {}
     Context(Interpreter &interp,
-            tl::optional<std::shared_ptr<Environment>> parent)
+            const tl::optional<std::shared_ptr<Environment>> &parent)
         // Following the recursive approach in the book, an iterative approach
         // would make this easier and faster
         : m_interp{interp}, m_previous(interp.m_env) {

@@ -56,7 +56,7 @@ void Resolver::declare(Token const &name) {
   if (m_scopes.back().contains(name.lexem)) {
     had_error = true;
     report(Error{name.line, fmt::format("at '{}'", name.lexem),
-            "Already a variable with this name in this scope."});
+                 "Already a variable with this name in this scope."});
   }
 
   m_scopes.back().insert_or_assign(name.lexem, false);
@@ -89,7 +89,7 @@ void Resolver::visit(Variable const &expr) {
       not m_scopes.back()[expr.name.lexem]) {
     had_error = true;
     report(Error{expr.name.line, fmt::format("at '{}'", expr.name.lexem),
-            "Can't read local variable in its own initializer."});
+                 "Can't read local variable in its own initializer."});
   }
 
   resolveLocal(&expr, expr.name);
@@ -104,7 +104,7 @@ void Resolver::visit(FunctionStmt const &stmt) {
   declare(stmt.name);
   define(stmt.name);
 
-  resolveFunction(stmt, FunctionType::FUNCTION);
+  resolveFunction(stmt, FunctionType::Function);
 }
 
 void Resolver::visit(Expression const &stmt) { resolve(stmt.expr.get()); }
@@ -118,15 +118,22 @@ void Resolver::visit(If const &stmt) {
 void Resolver::visit(Print const &stmt) { resolve(stmt.expr.get()); }
 
 void Resolver::visit(Return const &stmt) {
-  if (m_currentFunction == FunctionType::NONE) {
+  if (m_currentFunction == FunctionType::None) {
     had_error = true;
     report(Error{stmt.keyword.line, fmt::format("at '{}'", stmt.keyword.lexem),
-            "Can't return from top-level code."});
+                 "Can't return from top-level code."});
   }
 
-  if (stmt.value) {
-    resolve(stmt.value.get());
+  if (not isA<Nil>(*stmt.value)) {
+    if (m_currentFunction == FunctionType::Initializer) {
+      had_error = true;
+      report(Error{stmt.keyword.line,
+                   fmt::format("at '{}'", stmt.keyword.lexem),
+                   "Can't return a value from an initializer."});
+    }
   }
+
+  resolve(stmt.value.get());
 }
 
 void Resolver::visit(While const &stmt) {
@@ -150,3 +157,41 @@ void Resolver::visit(Call const &expr) {
 void Resolver::visit(Grouping const &expr) { resolve(expr.expr.get()); }
 
 void Resolver::visit(Unary const &expr) { resolve(expr.expr.get()); }
+
+void Resolver::visit(Class const &stmt) {
+  ClassType enclosing_class = m_currentClass;
+  m_currentClass = ClassType::Class;
+
+  declare(stmt.name);
+  define(stmt.name);
+
+  beginScope();
+  m_scopes.back().insert_or_assign("this", true);
+
+  for (auto &method_ptr : stmt.methods) {
+    auto &method = asA<FunctionStmt>(*method_ptr);
+    FunctionType declaration = method.name.lexem == "init"
+                                   ? FunctionType::Initializer
+                                   : FunctionType::Method;
+
+    resolveFunction(method, declaration);
+  }
+
+  endScope();
+  m_currentClass = enclosing_class;
+}
+
+void Resolver::visit(Get const &expr) { resolve(expr.object.get()); }
+void Resolver::visit(Set const &expr) {
+  resolve(expr.value.get());
+  resolve(expr.object.get());
+}
+
+void Resolver::visit(This const &expr) {
+  if (m_currentClass == ClassType::None) {
+    had_error = true;
+    report(Error{expr.keyword.line, fmt::format("at '{}'", expr.keyword.lexem),
+                 "Can't use 'this' outside of a class."});
+  }
+  resolveLocal(&expr, expr.keyword);
+}

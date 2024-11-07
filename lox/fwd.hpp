@@ -25,11 +25,17 @@ class Unary;
 class Variable;
 class Function;
 class NativeFunction;
+class LoxClass;
+class LoxInstance;
+class Get;
+class Set;
+class This;
 using ExprPtr = std::shared_ptr<Expr>;
 
 // Statements
 class Stmt;
 class Block;
+class Class;
 class Expression;
 class If;
 class Print;
@@ -60,12 +66,18 @@ public:
   virtual void visit(Assign const &expr) = 0;
   virtual void visit(Call const &expr) = 0;
   virtual void visit(Function const &expr) = 0;
-  virtual void visit(NativeFunction const &expr){};
+  virtual void visit(NativeFunction const &expr) = 0;
+  virtual void visit(LoxClass const &expr) = 0;
+  virtual void visit(LoxInstance const &expr) = 0;
+  virtual void visit(Get const &expr) = 0;
+  virtual void visit(Set const &expr) = 0;
+  virtual void visit(This const &expr) = 0;
   // Statements
   virtual void visit(Expression const &stmt) = 0;
   virtual void visit(Print const &stmt) = 0;
   virtual void visit(Var const &stmt) = 0;
   virtual void visit(Block const &stmt) = 0;
+  virtual void visit(Class const &stmt) = 0;
   virtual void visit(If const &stmt) = 0;
   virtual void visit(While const &stmt) = 0;
   virtual void visit(Return const &stmt) = 0;

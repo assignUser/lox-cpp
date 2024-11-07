@@ -4,8 +4,10 @@
 
 #pragma once
 
+#include <memory>
 #include <tl/optional.hpp>
 #include <utility>
+#include <vector>
 
 #include "lox/env.hpp"
 #include "lox/expressions.hpp"
@@ -15,6 +17,7 @@ class Stmt {
 public:
   enum class StmtKind {
     Block,
+    Class,
     Expression,
     FunctionStmt,
     If,
@@ -40,15 +43,16 @@ private:
   StmtKind m_kind;
 };
 
-const static std::unordered_map<Stmt::StmtKind, std::string_view> stmt_kind_literals{
-    {Stmt::StmtKind::Block, "Block"},
-    {Stmt::StmtKind::Expression, "Expression"},
-    {Stmt::StmtKind::FunctionStmt, "FunctionStmt"},
-    {Stmt::StmtKind::If, "If"},
-    {Stmt::StmtKind::Print, "Print"},
-    {Stmt::StmtKind::Var, "Var"},
-    {Stmt::StmtKind::While, "While"},
-};
+const static std::unordered_map<Stmt::StmtKind, std::string_view>
+    stmt_kind_literals{
+        {Stmt::StmtKind::Block, "Block"},
+        {Stmt::StmtKind::Expression, "Expression"},
+        {Stmt::StmtKind::FunctionStmt, "FunctionStmt"},
+        {Stmt::StmtKind::If, "If"},
+        {Stmt::StmtKind::Print, "Print"},
+        {Stmt::StmtKind::Var, "Var"},
+        {Stmt::StmtKind::While, "While"},
+    };
 
 template <>
 struct fmt::formatter<Stmt::StmtKind> : fmt::formatter<std::string_view> {
@@ -60,7 +64,7 @@ struct fmt::formatter<Stmt::StmtKind> : fmt::formatter<std::string_view> {
 class Expression : public Stmt {
 public:
   [[nodiscard]] static StmtPtr make(ExprPtr expr) {
-    return std::unique_ptr<Stmt>(new Expression{std::move(expr)});
+    return std::shared_ptr<Stmt>(new Expression{std::move(expr)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
@@ -77,7 +81,7 @@ private:
 class Print : public Stmt {
 public:
   [[nodiscard]] static StmtPtr make(ExprPtr expr) {
-    return std::unique_ptr<Stmt>(new Print{std::move(expr)});
+    return std::shared_ptr<Stmt>(new Print{std::move(expr)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
@@ -94,7 +98,7 @@ private:
 class Var : public Stmt {
 public:
   [[nodiscard]] static StmtPtr make(Token name, ExprPtr initializer) {
-    return std::unique_ptr<Stmt>(
+    return std::shared_ptr<Stmt>(
         new Var{std::move(name), std::move(initializer)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
@@ -115,7 +119,7 @@ class Block : public Stmt {
 public:
   [[nodiscard]] static StmtPtr
   make(std::vector<StmtPtr> stmts = std::vector<StmtPtr>{}) {
-    return std::unique_ptr<Stmt>(new Block{std::move(stmts)});
+    return std::shared_ptr<Stmt>(new Block{std::move(stmts)});
   }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
   static bool classof(const Stmt &stmt) {
@@ -134,7 +138,7 @@ public:
   [[nodiscard]] static StmtPtr
   make(ExprPtr condition, StmtPtr then_stmt,
        tl::optional<StmtPtr> else_stmt = tl::nullopt) {
-    return std::unique_ptr<Stmt>(new If{
+    return std::shared_ptr<Stmt>(new If{
         std::move(condition), std::move(then_stmt), std::move(else_stmt)});
   }
 
@@ -156,7 +160,7 @@ private:
 class While : public Stmt {
 public:
   [[nodiscard]] static StmtPtr make(ExprPtr condition, StmtPtr body) {
-    return std::unique_ptr<Stmt>(
+    return std::shared_ptr<Stmt>(
         new While{std::move(condition), std::move(body)});
   }
 
@@ -177,7 +181,7 @@ private:
 class Return : public Stmt {
 public:
   [[nodiscard]] static StmtPtr make(Token keyw, ExprPtr val) {
-    return std::unique_ptr<Stmt>(new Return{std::move(keyw), std::move(val)});
+    return std::shared_ptr<Stmt>(new Return{std::move(keyw), std::move(val)});
   }
 
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
@@ -198,7 +202,7 @@ class FunctionStmt : public Stmt {
 public:
   [[nodiscard]] static StmtPtr make(Token name, std::vector<Token> params,
                                     std::vector<StmtPtr> body) {
-    return std::unique_ptr<Stmt>(
+    return std::shared_ptr<Stmt>(
         new FunctionStmt{std::move(name), std::move(params), std::move(body)});
   }
 
@@ -218,6 +222,27 @@ private:
         params{std::move(params)}, body{std::move(body)} {}
 };
 
+class Class : public Stmt {
+public:
+  [[nodiscard]] static StmtPtr make(Token name, std::vector<StmtPtr> methods) {
+    return std::shared_ptr<Stmt>(
+        new Class(std::move(name), std::move(methods)));
+  }
+
+  Token name;
+  std::vector<StmtPtr> methods{};
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  static bool classof(const Stmt &stmt) {
+    return stmt.getKind() == Stmt::StmtKind::Class;
+  }
+
+private:
+  [[nodiscard]] Class(Token name, std::vector<StmtPtr> methods)
+      : Stmt(StmtKind::Class), name{std::move(name)},
+        methods{std::move(methods)} {}
+};
+
 class Callable {
 public:
   Callable() = default;
@@ -235,9 +260,10 @@ public:
 class Function : public Expr, public Callable {
 public:
   [[nodiscard]] static ExprPtr make(StmtPtr declaration,
-                                    std::shared_ptr<Environment> closure) {
-    return std::unique_ptr<Function>(
-        new Function(std::move(declaration), std::move(closure)));
+                                    std::shared_ptr<Environment> closure,
+                                    bool is_initializer = false) {
+    return std::shared_ptr<Function>(
+        new Function(std::move(declaration), std::move(closure), is_initializer));
   }
   [[nodiscard]] bool isCallable() const override { return true; }
   void accept(Visitor &visitor) const override { visitor.visit(*this); }
@@ -249,13 +275,20 @@ public:
       return false;
     }
 
-    return stmt_as<FunctionStmt>(*declaration).name.lexem ==
-           stmt_as<FunctionStmt>(*expr_as<Function>(other).declaration)
-               .name.lexem;
+    return asA<FunctionStmt const>(*declaration).name.lexem ==
+               asA<FunctionStmt const>(*asA<Function const>(other).declaration)
+                   .name.lexem and
+           m_closure == asA<Function const>(other).m_closure;
   }
   ExprPtr call(Interpreter &interpret, std::vector<ExprPtr> arguments) override;
   [[nodiscard]] size_t arity() const noexcept override {
-    return stmt_as<FunctionStmt>(*declaration).params.size();
+    return asA<FunctionStmt const>(*declaration).params.size();
+  }
+
+  ExprPtr bind(ExprPtr instance) {
+    auto env = std::make_shared<Environment>(m_closure);
+    env->define("this", std::move(instance));
+    return Function::make(declaration, env, m_isInitializer);
   }
 
   // TODO should this be a std::unique<FunctionStmt> ?
@@ -263,9 +296,12 @@ public:
 
 private:
   std::shared_ptr<Environment> m_closure;
+  bool m_isInitializer{false};
 
-  explicit Function(StmtPtr decl, std::shared_ptr<Environment> closure)
-      : Expr(ExprKind::Function), Callable(), m_closure{std::move(closure)} {
+  explicit Function(StmtPtr decl, std::shared_ptr<Environment> closure,
+                    bool is_initializer)
+      : Expr(ExprKind::Function), Callable(), m_closure{std::move(closure)},
+        m_isInitializer{is_initializer} {
     if (not isA<FunctionStmt>(*decl)) {
       throw std::runtime_error("Function declaration must be FunctionStmt.");
     }
@@ -285,4 +321,94 @@ public:
 
 protected:
   explicit NativeFunction() : Expr(ExprKind::NativeFunction), Callable() {}
+};
+
+class LoxClass : public Expr, public Callable {
+public:
+  [[nodiscard]] static ExprPtr
+  make(const std::string &name,
+       std::unordered_map<std::string, ExprPtr> methods) {
+    return std::shared_ptr<Expr>(new LoxClass(name, std::move(methods)));
+  }
+
+  [[nodiscard]] tl::optional<ExprPtr>
+  findMethod(std::string const &name) const {
+    return (const_cast<LoxClass *>(this)->findMethod(name));
+  }
+
+  [[nodiscard]] tl::optional<ExprPtr> findMethod(std::string const &name) {
+    if (m_methods.contains(name)) {
+      return m_methods[name];
+    } else {
+      return tl::nullopt;
+    }
+  }
+
+  [[nodiscard]] size_t arity() const noexcept override {
+    auto const &initializer = findMethod("init");
+    return initializer.map_or(
+        [&](ExprPtr const &init) { return asA<Function>(*init).arity(); }, 0);
+  }
+
+  [[nodiscard]] bool isCallable() const override { return true; }
+  ExprPtr call(Interpreter &interpreter,
+               std::vector<ExprPtr> arguments) override;
+
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    if (not isA<LoxClass>(other)) {
+      return false;
+    }
+
+    return asA<LoxClass const>(other).name == name;
+  }
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Class;
+  }
+
+  std::string name{};
+
+private:
+  std::unordered_map<std::string, ExprPtr> m_methods{};
+
+  explicit LoxClass(std::string name,
+                    std::unordered_map<std::string, ExprPtr> methods)
+      : name{std::move(name)}, m_methods{std::move(methods)},
+        Expr(ExprKind::Class) {}
+};
+
+class LoxInstance : public Expr {
+public:
+  [[nodiscard]] ExprPtr get(Token const &name) const;
+  void set(Token const &name, ExprPtr value) {
+    m_fields.insert_or_assign(name.lexem, value);
+  }
+  [[nodiscard]] static ExprPtr make(LoxClass &klass) {
+    auto instance = ExprPtr(new LoxInstance{klass});
+    // This is required to properly bind methods to the instance
+    asA<LoxInstance>(*instance).m_this = instance;
+    return std::move(instance);
+  }
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    if (not isA<LoxInstance>(other)) {
+      return false;
+    }
+
+    return m_class.name == asA<LoxInstance const>(other).m_class.name;
+  }
+
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Instance;
+  }
+  explicit operator std::string() const { return m_class.name + " instance"; }
+
+private:
+  LoxClass &m_class;
+  std::weak_ptr<Expr> m_this;
+  std::unordered_map<std::string, ExprPtr> m_fields{};
+  explicit LoxInstance(LoxClass &klass)
+      : Expr(ExprKind::Instance), m_class{klass} {}
 };
