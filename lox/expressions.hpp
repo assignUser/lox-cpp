@@ -5,11 +5,8 @@
 #pragma once
 #include <algorithm>
 #include <concepts>
-#include <iterator>
 #include <memory>
-#include <ranges>
 #include <stdexcept>
-#include <type_traits>
 #include <utility>
 
 #include <fmt/format.h>
@@ -20,7 +17,7 @@
 
 class Expr {
 public:
-  enum class ExprKind {
+  enum class ExprKind : std::uint8_t {
     Assign,
     Binary,
     Boolean,

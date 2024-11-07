@@ -106,6 +106,13 @@ StmtPtr Parser::declaration() {
 
 StmtPtr Parser::classDeclaration() {
   Token name = consume(Token::Type::IDENTIFIER, "Expect class name.");
+  
+  MaybeExpr superclass{};
+  if(match(Token::Type::LESS)){
+    consume(Token::Type::IDENTIFIER, "Expect superclass name.");
+    superclass = Variable::make(previous());
+  } 
+
   consume(Token::Type::LEFT_BRACE, "Expect '{' before class body.");
 
   std::vector<StmtPtr> methods{};
@@ -116,7 +123,7 @@ StmtPtr Parser::classDeclaration() {
 
   consume(Token::Type::RIGHT_BRACE, "Expect '}' after class body.");
 
-  return Class::make(std::move(name), std::move(methods));
+  return Class::make(std::move(name), std::move(methods), std::move(superclass));
 }
 
 StmtPtr Parser::function(std::string const &kind) {

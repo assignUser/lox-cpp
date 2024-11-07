@@ -164,6 +164,17 @@ void Resolver::visit(Class const &stmt) {
 
   declare(stmt.name);
   define(stmt.name);
+  if(stmt.superclass){
+    Token const& superclass_name = asA<Variable>(*stmt.superclass.value()).name;
+    if(stmt.name.lexem == superclass_name.lexem){
+    had_error = true;
+    report(Error{superclass_name.line , fmt::format("at '{}'", superclass_name.lexem),
+                 "A class can't inherit from itself."});
+    }
+
+    resolve(stmt.superclass.value().get());
+  }
+
 
   beginScope();
   m_scopes.back().insert_or_assign("this", true);

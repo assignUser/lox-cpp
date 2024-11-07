@@ -340,6 +340,15 @@ void Interpreter::visit(Return const &stmt) {
 }
 
 void Interpreter::visit(Class const &stmt) {
+  MaybeExpr superclass{};
+  if(stmt.superclass){
+    evaluate(stmt.superclass.value().get());
+    superclass = std::move(m_result);
+    if(not isA<LoxClass>(**superclass)){
+      throw RuntimeError{ asA<Variable>(*stmt.superclass.value()).name, "Superclass must be a class." };
+    }
+  }
+
   // Allow references to the class inside it's methods
   m_env->define(stmt.name.lexem, Nil::make());
 
@@ -350,7 +359,7 @@ void Interpreter::visit(Class const &stmt) {
     methods.insert_or_assign(asA<FunctionStmt>(*method).name.lexem, std::move(function));
   }
 
-  ExprPtr klass = LoxClass::make(stmt.name.lexem, std::move(methods));
+  ExprPtr klass = LoxClass::make(stmt.name.lexem, std::move(methods), superclass);
   m_env->assign(stmt.name, klass);
 }
 

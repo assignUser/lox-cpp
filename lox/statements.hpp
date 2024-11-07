@@ -77,10 +77,12 @@ class Expression : public Stmt {
   make(ExprPtr expr) {
     return std::shared_ptr<Stmt>(new Expression{std::move(expr)});
   }
+
   void
   accept(Visitor& visitor) const override {
     visitor.visit(*this);
   }
+
   static bool
   classof(Stmt const& stmt) {
     return stmt.getKind() == Stmt::StmtKind::Expression;
@@ -98,10 +100,12 @@ class Print : public Stmt {
   make(ExprPtr expr) {
     return std::shared_ptr<Stmt>(new Print{std::move(expr)});
   }
+
   void
   accept(Visitor& visitor) const override {
     visitor.visit(*this);
   }
+
   static bool
   classof(Stmt const& stmt) {
     return stmt.getKind() == Stmt::StmtKind::Print;
@@ -268,6 +272,10 @@ class Class : public Stmt {
  public:
   [[nodiscard]] static StmtPtr
   make(Token name, std::vector<StmtPtr> methods, MaybeExpr superclass = tl::nullopt) {
+    if(superclass and superclass.value().get()->getKind() != Expr::ExprKind::Variable){
+      throw "Tried to create a class with a non-variable superclass.";
+    }
+
     return std::shared_ptr<Stmt>(
         new Class(std::move(name), std::move(methods), std::move(superclass)));
   }
@@ -399,8 +407,8 @@ class NativeFunction : public Expr, public Callable {
 class LoxClass : public Expr, public Callable {
  public:
   [[nodiscard]] static ExprPtr
-  make(std::string const& name, std::unordered_map<std::string, ExprPtr> methods) {
-    return std::shared_ptr<Expr>(new LoxClass(name, std::move(methods)));
+  make(std::string const& name, std::unordered_map<std::string, ExprPtr> methods, MaybeExpr superclass = tl::nullopt) {
+    return std::shared_ptr<Expr>(new LoxClass(name, std::move(methods), std::move(superclass)));
   }
 
   [[nodiscard]] MaybeExpr
@@ -412,6 +420,8 @@ class LoxClass : public Expr, public Callable {
   findMethod(std::string const& name) {
     if (m_methods.contains(name)) {
       return m_methods[name];
+    } if(superclass){
+      return asA<LoxClass>(**superclass).findMethod(name);
     } else {
       return tl::nullopt;
     }
@@ -449,12 +459,13 @@ class LoxClass : public Expr, public Callable {
   }
 
   std::string name{};
+  MaybeExpr superclass{};
 
  private:
   std::unordered_map<std::string, ExprPtr> m_methods{};
 
-  explicit LoxClass(std::string name, std::unordered_map<std::string, ExprPtr> methods)
-      : name{std::move(name)}, m_methods{std::move(methods)}, Expr(ExprKind::Class) {}
+  explicit LoxClass(std::string name, std::unordered_map<std::string, ExprPtr> methods, MaybeExpr superclass)
+      : name{std::move(name)}, m_methods{std::move(methods)}, superclass{std::move(superclass)}, Expr(ExprKind::Class) {}
 };
 
 class LoxInstance : public Expr {
