@@ -33,6 +33,7 @@ public:
   void visit(LoxInstance const &expr) override{};
   void visit(Get const &expr) override;
   void visit(Set const &expr) override;
+  void visit(Super const &expr) override;
   void visit(This const &expr) override;
   // Statements
   void visit(Expression const &stmt) override;
@@ -48,8 +49,8 @@ public:
   bool had_error{false};
 
 private:
-  enum class FunctionType { None, Function, Method, Initializer };
-  enum class ClassType {None, Class};
+  enum class FunctionType : std::uint8_t { None, Function, Method, Initializer };
+  enum class ClassType : std::uint8_t {None, Class, Subclass};
 
   void resolve(Expr const *expr);
   void resolve(Stmt const *stmt);

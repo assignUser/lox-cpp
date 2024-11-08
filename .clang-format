@@ -7,4 +7,4 @@ QualifierAlignment: Right
 ColumnLimit: 100
 IncludeBlocks: Preserve
 BreakTemplateDeclarations: Yes
-BreakAfterReturnType: All 
+BreakAfterReturnType: ExceptShortType 

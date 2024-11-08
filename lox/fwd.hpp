@@ -29,6 +29,7 @@ class LoxClass;
 class LoxInstance;
 class Get;
 class Set;
+class Super;
 class This;
 using ExprPtr = std::shared_ptr<Expr>;
 
@@ -71,6 +72,7 @@ public:
   virtual void visit(LoxInstance const &expr) = 0;
   virtual void visit(Get const &expr) = 0;
   virtual void visit(Set const &expr) = 0;
+  virtual void visit(Super const &expr) = 0;
   virtual void visit(This const &expr) = 0;
   // Statements
   virtual void visit(Expression const &stmt) = 0;
