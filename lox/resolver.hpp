@@ -49,8 +49,8 @@ public:
   bool had_error{false};
 
 private:
-  enum class FunctionType { None, Function, Method, Initializer };
-  enum class ClassType {None, Class};
+  enum class FunctionType : std::uint8_t { None, Function, Method, Initializer };
+  enum class ClassType : std::uint8_t {None, Class, Subclass};
 
   void resolve(Expr const *expr);
   void resolve(Stmt const *stmt);

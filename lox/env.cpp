@@ -31,11 +31,6 @@ Environment &Environment::operator=(Environment const &other) {
                                          bool search_enclosing) const {
   Environment const &env = ancestor(distance);
 
-  if (not(name.type == Token::Type::IDENTIFIER or
-          name.type == Token::Type::THIS)) {
-    throw RuntimeError(name, "Token not an identifier");
-  }
-
   if (env.m_values.contains(name.lexem)) {
     return env.m_values.at(name.lexem);
   }

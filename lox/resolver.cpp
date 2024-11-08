@@ -171,7 +171,8 @@ void Resolver::visit(Class const &stmt) {
     report(Error{superclass_name.line , fmt::format("at '{}'", superclass_name.lexem),
                  "A class can't inherit from itself."});
     }
-
+    
+    m_currentClass = ClassType::Subclass;
     resolve(stmt.superclass.value().get());
     beginScope();
     m_scopes.back().insert_or_assign("super", true);
@@ -215,5 +216,14 @@ void Resolver::visit(This const &expr) {
 }
 
 void Resolver::visit(Super const& expr){
+  if(m_currentClass == ClassType::None){
+    had_error = true;
+    report(Error{expr.keyword.line, fmt::format("at '{}'", expr.keyword.lexem),
+                 "Can't use 'super' outside of a class."});
+  } else if(m_currentClass != ClassType::Subclass){
+    had_error = true;
+    report(Error{expr.keyword.line, fmt::format("at '{}'", expr.keyword.lexem),
+                 "Can't use 'super' in a class with no superclass."});
+  }
   resolveLocal(&expr, expr.keyword);
 }
