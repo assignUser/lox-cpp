@@ -11,7 +11,7 @@
 #include "lox/expressions.hpp"
 #include "lox/statements.hpp"
 
-Token const &Parser::advance() {
+Token const& Parser::advance() {
   if (not atEnd()) {
     m_current++;
   }
@@ -27,14 +27,14 @@ bool Parser::check(Token::Type type) const {
   return peek().type == type;
 }
 
-Token const &Parser::consume(Token::Type type, std::string const &message) {
+Token const& Parser::consume(Token::Type type, std::string const& message) {
   if (check(type)) {
     return advance();
   }
   throw error(peek(), message);
 }
 
-Error Parser::error(Token const &token, std::string const &message) {
+Error Parser::error(Token const& token, std::string const& message) {
   Error error = token.type == Token::Type::END_OF_FILE
                     ? Error{token.line, "at end", message}
                     : Error{token.line, "at '" + token.lexem + "'", message};
@@ -42,9 +42,9 @@ Error Parser::error(Token const &token, std::string const &message) {
   return error;
 }
 
-Token const &Parser::peek() const { return m_tokens.at(m_current); }
+Token const& Parser::peek() const { return m_tokens.at(m_current); }
 
-Token const &Parser::previous() const { return m_tokens.at(m_current - 1); }
+Token const& Parser::previous() const { return m_tokens.at(m_current - 1); }
 
 void Parser::synchronize() {
   advance();
@@ -55,16 +55,16 @@ void Parser::synchronize() {
     }
 
     switch (peek().type) {
-    case Token::Type::CLASS:
-    case Token::Type::FUN:
-    case Token::Type::VAR:
-    case Token::Type::FOR:
-    case Token::Type::IF:
-    case Token::Type::WHILE:
-    case Token::Type::PRINT:
-    case Token::Type::RETURN:
-      return;
-    default:;
+      case Token::Type::CLASS:
+      case Token::Type::FUN:
+      case Token::Type::VAR:
+      case Token::Type::FOR:
+      case Token::Type::IF:
+      case Token::Type::WHILE:
+      case Token::Type::PRINT:
+      case Token::Type::RETURN:
+        return;
+      default:;
     }
 
     advance();
@@ -106,12 +106,12 @@ StmtPtr Parser::declaration() {
 
 StmtPtr Parser::classDeclaration() {
   Token name = consume(Token::Type::IDENTIFIER, "Expect class name.");
-  
+
   MaybeExpr superclass{};
-  if(match(Token::Type::LESS)){
+  if (match(Token::Type::LESS)) {
     consume(Token::Type::IDENTIFIER, "Expect superclass name.");
     superclass = Variable::make(previous());
-  } 
+  }
 
   consume(Token::Type::LEFT_BRACE, "Expect '{' before class body.");
 
@@ -126,17 +126,14 @@ StmtPtr Parser::classDeclaration() {
   return Class::make(std::move(name), std::move(methods), std::move(superclass));
 }
 
-StmtPtr Parser::function(std::string const &kind) {
-  Token name =
-      consume(Token::Type::IDENTIFIER, fmt::format("Expect {} name.", kind));
+StmtPtr Parser::function(std::string const& kind) {
+  Token name = consume(Token::Type::IDENTIFIER, fmt::format("Expect {} name.", kind));
 
-  consume(Token::Type::LEFT_PAREN,
-          fmt::format("Expect '(' after {} name.", kind));
+  consume(Token::Type::LEFT_PAREN, fmt::format("Expect '(' after {} name.", kind));
 
   std::vector<Token> parameters{};
   auto consume_identifier = [&]() {
-    parameters.push_back(
-        consume(Token::Type::IDENTIFIER, "Expect parameter name."));
+    parameters.push_back(consume(Token::Type::IDENTIFIER, "Expect parameter name."));
   };
 
   if (not check(Token::Type::RIGHT_PAREN)) {
@@ -153,12 +150,10 @@ StmtPtr Parser::function(std::string const &kind) {
   }
   consume(Token::Type::RIGHT_PAREN, "Expect ')' after parameters.");
 
-  consume(Token::Type::LEFT_BRACE,
-          fmt::format("Expect '{{' before {} body.", kind));
+  consume(Token::Type::LEFT_BRACE, fmt::format("Expect '{{' before {} body.", kind));
   std::vector<StmtPtr> body = block();
 
-  return FunctionStmt::make(std::move(name), std::move(parameters),
-                            std::move(body));
+  return FunctionStmt::make(std::move(name), std::move(parameters), std::move(body));
 }
 
 StmtPtr Parser::varDeclaration() {
@@ -209,8 +204,7 @@ StmtPtr Parser::ifStatement() {
     else_branch = statement();
   }
 
-  return If::make(std::move(condition), std::move(then_branch),
-                  std::move(else_branch));
+  return If::make(std::move(condition), std::move(then_branch), std::move(else_branch));
 }
 
 StmtPtr Parser::whileStatement() {
@@ -316,7 +310,7 @@ ExprPtr Parser::assignment() {
       Token name = asA<Variable>(*expr.get()).name;
       return Assign::make(name, std::move(value));
     } else if (isA<Get>(*expr.get())) {
-      Get const &get = asA<Get>(*expr);
+      Get const& get = asA<Get>(*expr);
       return Set::make(get.name, get.object, std::move(value));
     }
     m_hasError = true;
@@ -356,7 +350,7 @@ ExprPtr Parser::equality() {
   ExprPtr expr = comparison();
 
   while (match(Token::Type::BANG_EQUAL, Token::Type::EQUAL_EQUAL)) {
-    Token const &op = previous();
+    Token const& op = previous();
     ExprPtr rhs = comparison();
     expr = Binary::make(std::move(expr), op, std::move(rhs));
   }
@@ -367,9 +361,9 @@ ExprPtr Parser::equality() {
 // comparison → term ((">" | ">=" | "<" | "<=") term)*;
 ExprPtr Parser::comparison() {
   ExprPtr expr = term();
-  while (match(Token::Type::GREATER, Token::Type::GREATER_EQUAL,
-               Token::Type::LESS, Token::Type::LESS_EQUAL)) {
-    Token const &op = previous();
+  while (match(Token::Type::GREATER, Token::Type::GREATER_EQUAL, Token::Type::LESS,
+               Token::Type::LESS_EQUAL)) {
+    Token const& op = previous();
     ExprPtr rhs = term();
     expr = Binary::make(std::move(expr), op, std::move(rhs));
   }
@@ -381,7 +375,7 @@ ExprPtr Parser::comparison() {
 ExprPtr Parser::term() {
   ExprPtr expr = factor();
   while (match(Token::Type::MINUS, Token::Type::PLUS)) {
-    Token const &op = previous();
+    Token const& op = previous();
     ExprPtr rhs = factor();
     expr = Binary::make(std::move(expr), op, std::move(rhs));
   }
@@ -393,7 +387,7 @@ ExprPtr Parser::term() {
 ExprPtr Parser::factor() {
   ExprPtr expr = unary();
   while (match(Token::Type::SLASH, Token::Type::STAR)) {
-    Token const &op = previous();
+    Token const& op = previous();
     ExprPtr rhs = unary();
     expr = Binary::make(std::move(expr), op, std::move(rhs));
   }
@@ -404,7 +398,7 @@ ExprPtr Parser::factor() {
 // unary → ("!" | "-") unary | primary;
 ExprPtr Parser::unary() {
   if (match(Token::Type::BANG, Token::Type::MINUS)) {
-    Token const &op = previous();
+    Token const& op = previous();
     ExprPtr rhs = unary();
     return Unary::make(op, rhs);
   }
@@ -419,8 +413,7 @@ ExprPtr Parser::call() {
     if (match(Token::Type::LEFT_PAREN)) {
       expr = finishCall(std::move(expr));
     } else if (match(Token::Type::DOT)) {
-      Token name =
-          consume(Token::Type::IDENTIFIER, "Expect property name after '.'.");
+      Token name = consume(Token::Type::IDENTIFIER, "Expect property name after '.'.");
       expr = Get::make(name, expr);
     } else {
       break;
@@ -447,8 +440,7 @@ ExprPtr Parser::finishCall(ExprPtr callee) {
     }
   }
 
-  Token paren =
-      consume(Token::Type::RIGHT_PAREN, "Expect ')' after arguments.");
+  Token paren = consume(Token::Type::RIGHT_PAREN, "Expect ')' after arguments.");
 
   return Call::make(std::move(callee), std::move(paren), std::move(arguments));
 }

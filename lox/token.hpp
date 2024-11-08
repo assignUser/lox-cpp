@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) assignUser
 #pragma once
 
+#include <cstdint>
 #include <unordered_map>
 #include <numeric>
 #include <string>
@@ -13,7 +14,7 @@
 #include <fmt/format.h>
 
 struct Token {
-  enum class Type {
+  enum class Type : std::uint8_t {
     // Single-character tokens.
     LEFT_PAREN,
     RIGHT_PAREN,

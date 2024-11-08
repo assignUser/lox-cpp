@@ -463,7 +463,7 @@ public:
   }
 
   static bool classof(const Expr &expr) {
-    return expr.getKind() == Expr::ExprKind::Super; 
+    return expr.getKind() == Expr::ExprKind::Super;
   }
 
   Token keyword;
