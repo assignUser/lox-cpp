@@ -466,6 +466,11 @@ ExprPtr Parser::primary() {
     return String::make(std::get<std::string>(previous().literal));
   } else if (match(Token::Type::NUMBER)) {
     return Number::make(std::get<double>(previous().literal));
+  } else if (match(Token::Type::SUPER)) {
+    Token keyword{previous()};
+    consume(Token::Type::DOT, "Expect '.' after 'super'.");
+    Token method{consume(Token::Type::IDENTIFIER, "Expect superclass method name.")};
+    return Super::make(std::move(keyword), std::move(method));
   } else if (match(Token::Type::THIS)) {
     return This::make(previous());
   } else if (match(Token::Type::IDENTIFIER)) {

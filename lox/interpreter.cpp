@@ -351,6 +351,12 @@ void Interpreter::visit(Class const &stmt) {
 
   // Allow references to the class inside it's methods
   m_env->define(stmt.name.lexem, Nil::make());
+  
+  std::unique_ptr<Context> ctx;
+  if(stmt.superclass){
+    ctx = std::make_unique<Context>(*this); 
+    m_env->define("super", *superclass);
+  }
 
   std::unordered_map<std::string, ExprPtr> methods{};
   for (auto const &method : stmt.methods) {
@@ -359,8 +365,10 @@ void Interpreter::visit(Class const &stmt) {
     methods.insert_or_assign(asA<FunctionStmt>(*method).name.lexem, std::move(function));
   }
 
-  ExprPtr klass = LoxClass::make(stmt.name.lexem, std::move(methods), superclass);
-  m_env->assign(stmt.name, klass);
+  ExprPtr klass = LoxClass::make(stmt.name.lexem, std::move(methods), std::move(superclass));
+  ctx.reset();
+
+  m_env->assign(stmt.name, std::move(klass));
 }
 
 void Interpreter::visit(Get const &expr) {
@@ -390,4 +398,16 @@ void Interpreter::visit(Set const &expr) {
 
 void Interpreter::visit(This const &expr) {
   lookUpVariable(expr.keyword, &expr);
+}
+
+void Interpreter::visit(Super const& expr){
+  size_t distance = m_locals.at(&expr);
+  ExprPtr superclass = m_env->getAt({.type=Token::Type::SUPER, .lexem="super"}, distance);
+  ExprPtr object = m_env->getAt({.type=Token::Type::THIS, .lexem="this"}, distance - 1);
+
+  MaybeExpr method = asA<LoxClass>(*superclass).findMethod(expr.method.lexem);
+  if(not method){
+    throw RuntimeError{expr.method, fmt::format("Undefined property '{}'.", expr.method.lexem)};
+  }
+  m_result = asA<Function>(**method).bind(object);
 }

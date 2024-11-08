@@ -173,6 +173,8 @@ void Resolver::visit(Class const &stmt) {
     }
 
     resolve(stmt.superclass.value().get());
+    beginScope();
+    m_scopes.back().insert_or_assign("super", true);
   }
 
 
@@ -189,6 +191,11 @@ void Resolver::visit(Class const &stmt) {
   }
 
   endScope();
+
+  if(stmt.superclass){
+    endScope();
+  }
+
   m_currentClass = enclosing_class;
 }
 
@@ -204,5 +211,9 @@ void Resolver::visit(This const &expr) {
     report(Error{expr.keyword.line, fmt::format("at '{}'", expr.keyword.lexem),
                  "Can't use 'this' outside of a class."});
   }
+  resolveLocal(&expr, expr.keyword);
+}
+
+void Resolver::visit(Super const& expr){
   resolveLocal(&expr, expr.keyword);
 }

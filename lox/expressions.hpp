@@ -31,6 +31,7 @@ public:
     Number,
     String,
     Set,
+    Super,
     This,
     Unary,
     Variable,
@@ -444,4 +445,31 @@ public:
 private:
   explicit This(Token keyword)
       : Expr(ExprKind::This), keyword{std::move(keyword)} {}
+};
+
+class Super : public Expr {
+public:
+  [[nodiscard]] static ExprPtr make(Token keyword, Token method) {
+    if (keyword.type != Token::Type::SUPER) {
+      throw "Tried to create Super with non SUPER token.";
+    }
+
+    return std::shared_ptr<Expr>(new Super{std::move(keyword), std::move(method)});
+  }
+
+  void accept(Visitor &visitor) const override { visitor.visit(*this); }
+  [[nodiscard]] bool equals(Expr const &other) const override {
+    return isA<Super>(other) && asA<Super const>(other).method.lexem == method.lexem;
+  }
+
+  static bool classof(const Expr &expr) {
+    return expr.getKind() == Expr::ExprKind::Super; 
+  }
+
+  Token keyword;
+  Token method;
+
+private:
+   Super(Token keyword, Token method)
+      : Expr(ExprKind::Super), keyword{std::move(keyword)}, method{std::move(method)} {}
 };
