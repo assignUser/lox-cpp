@@ -40,29 +40,23 @@ ExprPtr Interpreter::interpret(std::vector<StmtPtr> const& statements) {
     for (auto const& stmt : statements) {
       execute(stmt.get());
     }
+    return std::move(m_result);
   } catch (RuntimeError e) {
     m_hasError = true;
     report(e);
-    m_result = Nil::make();
+    return Nil::make();
   }
-
-  ExprPtr res = m_result;
-  m_result.reset();
-  return res;
 }
 
 ExprPtr Interpreter::interpret(Expr const* expr) {
   try {
     evaluate(expr);
+    return std::move(m_result);
   } catch (RuntimeError e) {
     m_hasError = true;
     report(e);
-    m_result = Nil::make();
+    return Nil::make();
   }
-
-  ExprPtr res = m_result;
-  m_result.reset();
-  return res;
 }
 
 void Interpreter::visit(Binary const& expr) {
@@ -77,8 +71,7 @@ void Interpreter::visit(Binary const& expr) {
     // `or` returns the lhs if `true` and rhs otherwise
     return;
   }
-  // post-pone move until after short-circuit evaluation
-  ExprPtr lhs{m_result};
+  ExprPtr lhs{std::move(m_result)};
 
   evaluate(expr.rhs.get());
 
@@ -97,7 +90,7 @@ void Interpreter::visit(Binary const& expr) {
       break;
   }
 
-  ExprPtr rhs{m_result};
+  ExprPtr rhs{std::move(m_result)};
 
   if (isA<Number>(*lhs) and isA<Number>(*rhs)) {
     switch (expr.op.type) {
@@ -165,7 +158,7 @@ void Interpreter::visit(String const& expr) { m_result = String::make(expr.value
 void Interpreter::visit(Unary const& expr) {
   evaluate(expr.expr.get());
   // properly not needed here
-  ExprPtr rhs{m_result};
+  ExprPtr rhs{std::move(m_result)};
 
   if (expr.op.type == Token::Type::MINUS) {
     if (isA<Number>(*rhs)) {
@@ -213,13 +206,12 @@ void Interpreter::visit(Print const& stmt) {
 }
 
 void Interpreter::visit(Var const& var) {
-  ExprPtr value = Nil::make();
   if (var.initializer->getKind() != Expr::ExprKind::Nil) {
     evaluate(var.initializer.get());
-    value = m_result;
+    m_env->define(var.name.lexem, std::move(m_result));
+  } else {
+    m_env->define(var.name.lexem, Nil::make());
   }
-
-  m_env->define(var.name.lexem, value);
 }
 
 void Interpreter::visit(Variable const& var) { lookUpVariable(var.name, &var); }
@@ -270,7 +262,7 @@ void Interpreter::visit(While const& stmt) {
 
 void Interpreter::visit(Call const& expr) {
   evaluate(expr.callee.get());
-  ExprPtr callee = m_result;
+  ExprPtr callee = std::move(m_result);
   if (not callee->isCallable()) {
     throw RuntimeError{expr.paren, "Can only call functions and classes."};
   }
@@ -278,7 +270,7 @@ void Interpreter::visit(Call const& expr) {
   std::vector<ExprPtr> arguments;
   for (ExprPtr const& argument : expr.arguments) {
     evaluate(argument.get());
-    arguments.push_back(m_result);
+    arguments.push_back(std::move(m_result));
   }
 
   auto& function = dynamic_cast<Callable&>(*callee);
@@ -299,10 +291,7 @@ void Interpreter::visit(FunctionStmt const& stmt) {
 void Interpreter::visit(Return const& stmt) {
   evaluate(stmt.value.get());
 
-  ExprPtr value{Nil::make()};
-  std::swap(m_result, value);
-
-  throw Return::make(stmt.keyword, value);
+  throw Return::make(stmt.keyword, std::move(m_result));
 }
 
 void Interpreter::visit(Class const& stmt) {
