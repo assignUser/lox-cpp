@@ -13,7 +13,7 @@ function(configure_target target)
                CXX_STANDARD_REQUIRED ON)
 
   get_target_property(target_type ${target} TYPE)
-  # target_compile_options(${target} PUBLIC -fsanitize=undefined -fsanitize=address )
+  target_compile_options(${target} PUBLIC -march=native) 
   # target_link_options(${target} PUBLIC -fsanitize=undefined -fsanitize=address )
   if(NOT target_type STREQUAL "EXECUTABLE")
     add_library(lox::${target} ALIAS ${target})

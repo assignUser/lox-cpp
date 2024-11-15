@@ -358,7 +358,7 @@ class Function : public Expr, public Callable {
   bind(ExprPtr instance) {
     auto env = std::make_shared<Environment>(m_closure);
     env->define("this", std::move(instance));
-    return Function::make(declaration, env, m_isInitializer);
+    return Function::make(declaration, std::move(env), m_isInitializer);
   }
 
   // TODO should this be a std::unique<FunctionStmt> ?
