@@ -234,13 +234,23 @@ void Interpreter::visit(Assign const& expr) {
 
 void Interpreter::visit(Block const& stmt) { executeBlock(stmt.statements, tl::nullopt); }
 
-void Interpreter::executeBlock(std::vector<StmtPtr> const& statements,
-                               tl::optional<std::shared_ptr<Environment>> const& parent_env) {
+ExprPtr Interpreter::executeBlock(std::vector<StmtPtr> const& statements,
+                                  tl::optional<std::shared_ptr<Environment>> const& parent_env) {
   Context ctx{*this, parent_env};
+
+  m_return = false;
 
   for (auto const& stmt : statements) {
     ctx.execute(stmt.get());
+    if (m_return) {
+      break;
+    }
   }
+
+  if (not m_result) {
+    m_result = Nil::make();
+  }
+  return m_result;
 }
 
 void Interpreter::visit(If const& stmt) {
@@ -256,6 +266,9 @@ void Interpreter::visit(While const& stmt) {
   evaluate(stmt.condition.get());
   while (m_result->truthy()) {
     execute(stmt.body.get());
+    if (m_return) {
+      break;
+    }
     evaluate(stmt.condition.get());
   }
 }
@@ -291,7 +304,7 @@ void Interpreter::visit(FunctionStmt const& stmt) {
 void Interpreter::visit(Return const& stmt) {
   evaluate(stmt.value.get());
 
-  throw Return::make(stmt.keyword, std::move(m_result));
+  m_return = true;
 }
 
 void Interpreter::visit(Class const& stmt) {
