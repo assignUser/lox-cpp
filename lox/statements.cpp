@@ -6,8 +6,7 @@
 #include "lox/error.hpp"
 #include "lox/interpreter.hpp"
 
-ExprPtr
-Function::call(Interpreter& interpreter, std::vector<ExprPtr> arguments) {
+ExprPtr Function::call(Interpreter& interpreter, std::vector<ExprPtr> arguments) {
   auto env = std::make_shared<Environment>(m_closure);
   auto const& decl = asA<FunctionStmt>(*declaration);
 
@@ -15,14 +14,9 @@ Function::call(Interpreter& interpreter, std::vector<ExprPtr> arguments) {
     env->define(decl.params.at(i).lexem, std::move(arguments.at(i)));
   }
 
-  try {
-    interpreter.executeBlock(decl.body, env);
-  } catch (StmtPtr const& return_value) {
-    if (not isA<Return>(*return_value)) {
-      throw "Unexpected statement instead of Return.";
-    } else if (not m_isInitializer) {
-      return asA<Return>(*return_value).value;
-    }
+  ExprPtr return_value = interpreter.executeBlock(decl.body, env);
+  if (not m_isInitializer) {
+    return std::move(return_value);
   }
 
   if (m_isInitializer) {
@@ -32,8 +26,7 @@ Function::call(Interpreter& interpreter, std::vector<ExprPtr> arguments) {
   return Nil::make();
 }
 
-ExprPtr
-LoxClass::call(Interpreter& interpreter, std::vector<ExprPtr> arguments) {
+ExprPtr LoxClass::call(Interpreter& interpreter, std::vector<ExprPtr> arguments) {
   auto instance = LoxInstance::make(*this);
   auto initializer_opt = findMethod("init");
   if (initializer_opt) {
@@ -49,8 +42,7 @@ LoxClass::call(Interpreter& interpreter, std::vector<ExprPtr> arguments) {
   return std::move(instance);
 }
 
-[[nodiscard]] ExprPtr
-LoxInstance::get(Token const& name) const {
+[[nodiscard]] ExprPtr LoxInstance::get(Token const& name) const {
   if (m_fields.contains(name.lexem)) {
     return m_fields.at(name.lexem);
   }

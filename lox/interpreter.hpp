@@ -31,8 +31,8 @@ class Interpreter : public Visitor {
     m_hasError = false;
   }
 
-  void executeBlock(std::vector<StmtPtr> const& statements,
-                    tl::optional<std::shared_ptr<Environment>> const& parent_env = tl::nullopt);
+  ExprPtr executeBlock(std::vector<StmtPtr> const& statements,
+                       tl::optional<std::shared_ptr<Environment>> const& parent_env = tl::nullopt);
 
   void visit(Binary const& expr) override;
   void visit(Boolean const& expr) override;
@@ -74,6 +74,7 @@ class Interpreter : public Visitor {
   ExprPtr m_result;
   ExprPtr m_tmp;
   bool m_hasError{false};
+  bool m_return{false};
   std::shared_ptr<Environment> m_env{};
   std::unordered_map<Expr const*, size_t> m_locals{};
 
