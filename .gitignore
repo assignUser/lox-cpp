@@ -35,3 +35,4 @@ build
 .ccache
 Testing/Temporary
 .gdb_history
+rox/target
