@@ -36,3 +36,7 @@ build
 Testing/Temporary
 .gdb_history
 rox/target
+
+# pixi environments
+.pixi
+*.egg-info

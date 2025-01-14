@@ -1,0 +1,15 @@
+[project]
+authors = ["Jacob Wujciak-Jens <jacob@wujciak.de>"]
+channels = ["conda-forge"]
+description = "Add a short description here"
+name = "lox-cpp"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+build_cpp = "just"
+cppval = { cmd = "dart tool/bin/test.dart chap13_inheritance -i $PIXI_PROJECT_ROOT/build/lox/lox", cwd = "build/_deps/lox_tests-src" }
+rsval = { cmd = "dart tool/bin/test.dart chap13_inheritance -i  $PIXI_PROJECT_ROOT/rox/target/debug/rox", cwd = "build/_deps/lox_tests-src" }
+
+[dependencies]
+dart-sdk = ">=2.18.2,<3"
