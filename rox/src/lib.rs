@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 // TODO remove
 use logos::Logos;
+use logos::Skip;
 use std::error::Error;
 use std::io::{self, stdout, Write};
 use std::num::ParseFloatError;
@@ -42,139 +43,215 @@ fn run_file(path: &str) -> Result<(), Box<dyn Error>> {
 }
 
 #[derive(Logos, Debug, PartialEq)]
-#[logos(skip r"[ \t\n\f]+")] // ignore white space
+#[logos(skip "//.*")] // ignore Comments
+#[logos(skip r"[ \t\f]+")] // ignore white space
+#[logos(extras = LexerPos)]
+#[logos(error = LexingError)]
 enum Token {
+    #[token(r"\n", lex_newline, priority = 100)]
+    NewLine,
+
     // Single-character tokens.
-    #[token("(")]
+    #[token("(", lex_column)]
     LeftParen,
 
-    #[token(")")]
+    #[token(")", lex_column)]
     RightParen,
 
-    #[token("{")]
+    #[token("{", lex_column)]
     LeftBrace,
 
-    #[token("}")]
+    #[token("}", lex_column)]
     RightBrace,
 
-    #[token(",")]
+    #[token(",", lex_column)]
     Comma,
 
-    #[token(".")]
+    #[token(".", lex_column)]
     Dot,
 
-    #[token("-")]
+    #[token("-", lex_column)]
     Minus,
 
-    #[token("+")]
+    #[token("+", lex_column)]
     Plus,
 
-    #[token(";")]
+    #[token(";", lex_column)]
     Semicolon,
 
-    #[token("/")]
+    #[token("/", lex_column)]
     Slash,
 
-    #[token("*")]
+    #[token("*", lex_column)]
     Star,
 
     // One or two character tokens.
-    #[token("!")]
+    #[token("!", lex_column)]
     Bang,
 
-    #[token("!=")]
+    #[token("!=", lex_column)]
     BangEqual,
 
-    #[token("=")]
+    #[token("=", lex_column)]
     Equal,
 
-    #[token("==")]
+    #[token("==", lex_column)]
     Equalequal,
 
-    #[token(">")]
+    #[token(">", lex_column)]
     Greater,
 
-    #[token(">=")]
+    #[token(">=", lex_column)]
     Greaterequal,
 
-    #[token("<")]
+    #[token("<", lex_column)]
     Less,
 
-    #[token("<=")]
+    #[token("<=", lex_column)]
     Lessequal,
 
     // Literals.
-    #[regex("[a-zA-Z_][a-zA-Z_0-9]*", |lex| lex.slice().to_string())]
+    #[regex("[a-zA-Z_][a-zA-Z_0-9]*", |lex| lex_column(lex); lex.slice().to_string())]
     Identifier(String),
 
-    #[regex("\"[^\"]*\"", lex_string)]
+    #[regex(r#""[^"\n]*"?"#, lex_string)]
     String(String),
-
-    #[regex(r"\d+(\.\d+)?", |lex| lex.slice().parse::<f64>()
+    // #[regex("\"[^\"\n]*", lex_column)]
+    // UnterminatedString,
+    #[regex(r"\d+(\.\d+)?", |lex| lex_column(lex); lex.slice().parse::<f64>()
         .expect("Number should be parsable!"))]
     Number(f64),
 
+    #[token("false", |lex| lex_column(lex); false)]
+    #[token("true", |lex| lex_column(lex); true)]
+    Bool(bool),
+
     // Keywords.
-    #[token("and")]
+    #[token("and", lex_column)]
     And,
 
-    #[token("class")]
+    #[token("class", lex_column)]
     Class,
 
-    #[token("else")]
+    #[token("else", lex_column)]
     Else,
 
-    #[token("false")]
-    False,
-
-    #[token("fun")]
+    #[token("fun", lex_column)]
     Fun,
 
-    #[token("for")]
+    #[token("for", lex_column)]
     For,
 
-    #[token("if")]
+    #[token("if", lex_column)]
     If,
 
-    #[token("nil")]
+    #[token("nil", lex_column)]
     Nil,
 
-    #[token("or")]
+    #[token("or", lex_column)]
     Or,
 
-    #[token("print")]
+    #[token("print", lex_column)]
     Print,
 
-    #[token("return")]
+    #[token("return", lex_column)]
     Return,
 
-    #[token("super")]
+    #[token("super", lex_column)]
     Super,
 
-    #[token("this")]
+    #[token("this", lex_column)]
     This,
 
-    #[token("true")]
-    True,
-
-    #[token("var")]
+    #[token("var", lex_column)]
     Var,
 
-    #[token("while")]
+    #[token("while", lex_column)]
     While,
 }
+#[derive(PartialEq, Clone, Debug)]
+struct LexerPos {
+    line: usize,
+    col: usize,
+    newline: usize,
+}
+impl Default for LexerPos {
+    fn default() -> Self {
+        LexerPos {
+            line: 1,
+            col: 1,
+            newline: 0,
+        }
+    }
+}
 
-fn lex_string(lexer: &mut logos::Lexer<Token>) -> String {
+#[derive(PartialEq, Clone, Debug)]
+struct SourcePos {
+    line: usize,
+    col: usize,
+}
+
+impl Default for SourcePos {
+    fn default() -> Self {
+        SourcePos { line: 1, col: 1 }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum LexingError {
+    UnterminatedString(SourcePos),
+    UnexpectedCharacter(SourcePos),
+}
+
+// impl From<LexingError::UnexpectedCharacter> for LexingError{
+// fn from(value: LexingError::UnexpectedCharacter) -> Self {
+// value
+//     }
+// }
+
+impl Default for LexingError {
+    fn default() -> Self {
+        LexingError::UnexpectedCharacter(SourcePos::default())
+    }
+}
+fn lex_space(lexer: &mut logos::Lexer<Token>) -> Skip {
+    lex_column(lexer);
+    Skip
+}
+
+fn lex_newline(lexer: &mut logos::Lexer<Token>) -> Skip {
+    dbg!(&lexer.extras);
+    lexer.extras.line += 1;
+    lexer.extras.newline = lexer.span().end;
+    Skip
+}
+
+fn lex_column(lexer: &mut logos::Lexer<Token>) {
+    // dbg!(&lexer.extras);
+    // dbg!(&lexer.span().start);
+    lexer.extras.col = lexer.span().start - lexer.extras.newline;
+}
+
+fn lex_string(lexer: &mut logos::Lexer<Token>) -> Result<String, LexingError> {
+    lex_column(lexer);
+    fn untermintated_string(lexer: &mut logos::Lexer<Token>) -> LexingError {
+        LexingError::UnterminatedString(SourcePos {
+            line: lexer.extras.line,
+            col: lexer.extras.col,
+        })
+    };
+
     let quoted_string = lexer.slice();
-    quoted_string
+    Ok(quoted_string
         .strip_prefix('"')
         .expect("Strings have to be quoted to be lexed!")
         .strip_suffix('"')
-        .expect("Strings have to be quoted to be lexed!")
-        .to_string()
+        .ok_or(untermintated_string(lexer))?
+        .to_string())
 }
 
 fn lex_number(lexer: &mut logos::Lexer<Token>) -> Result<f64, ParseFloatError> {
+    lex_column(lexer);
     lexer.slice().parse::<f64>()
 }
 
@@ -215,4 +292,65 @@ mod lexer {
     // IDENTIFIER     → ALPHA ( ALPHA | DIGIT )* ;
     // ALPHA          → "a" ... "z" | "A" ... "Z" | "_" ;
     // DIGIT          → "0" ... "9" ;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use Token::*;
+    type ResultToken<'a> = Result<Token, <Token as logos::Logos<'a>>::Error>;
+
+    #[test]
+    fn lexer_erros() {
+        let unterminated_string = Token::lexer(
+            "var words = \"This is an unterminated String\nvar b = 42;\n\"another one",
+        )
+        .collect::<Vec<ResultToken>>();
+        let expected: Vec<ResultToken> = vec![
+            Ok(Var),
+            Ok(Identifier("words".to_owned())),
+            Ok(Equal),
+            Err(LexingError::UnterminatedString(SourcePos {
+                col: 12,
+                line: 1,
+            })),
+            Ok(Var),
+            Ok(Identifier("b".to_owned())),
+            Ok(Equal),
+            Ok(Number(42.0)),
+            Ok(Semicolon),
+            Err(LexingError::UnterminatedString(SourcePos {
+                col: 1,
+                line: 3,
+            })),
+        ];
+        assert_eq!(unterminated_string, expected);
+    }
+
+    #[test]
+    fn lexer_basic() {
+        let lex = Token::lexer("if (true) { print(\"something\");}\n//@ß ignored\nvar a = 5.5;");
+        let expected: Vec<ResultToken> = vec![
+            Ok(If),
+            Ok(LeftParen),
+            Ok(Bool(true)),
+            Ok(RightParen),
+            Ok(LeftBrace),
+            Ok(Print),
+            Ok(LeftParen),
+            Ok(String("something".to_owned())),
+            Ok(RightParen),
+            Ok(Semicolon),
+            Ok(RightBrace),
+            Ok(Var),
+            Ok(Identifier("a".to_owned())),
+            Ok(Equal),
+            Ok(Number(5.5)),
+            Ok(Semicolon),
+        ];
+        assert_eq!(
+            expected,
+            lex.collect::<Vec<Result<Token, <Token as logos::Logos>::Error>>>()
+        );
+    }
 }
