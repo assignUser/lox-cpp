@@ -2,7 +2,7 @@ use std::env;
 use std::process;
 
 fn main() {
-    let result = rox::run(env::args());
+    let result = rox::cli::run(env::args());
 
     match result {
         Ok(()) => (),
