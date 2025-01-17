@@ -46,6 +46,7 @@ pub mod cli {
 
 mod scanner {
     use std::fmt::Display;
+    type ScannerResult = Result<Token, ScannerError>;
 
     pub fn scan(source: &str) -> Result<(), ScannerError> {
         let source = AsciiSource::build(source)?;
@@ -54,29 +55,81 @@ mod scanner {
         Ok(())
     }
 
-    ///
+    #[derive(Debug, PartialEq)]
+    pub struct SourcePos {
+        row: usize,
+        col: usize,
+    }
     #[derive(Debug)]
     pub struct AsciiSource<'a> {
         source: &'a [u8],
         curr: usize,
+        len: usize,
     }
+
     impl<'a> std::ops::Index<usize> for AsciiSource<'a> {
         type Output = u8;
         fn index(&self, index: usize) -> &Self::Output {
+            // adjust index for current 'head'
+            let index = self.curr + index;
+            if index < self.curr || index >= self.len {
+                panic!(
+                    "index out of bounds: the len is {len} but the index is {index} ",
+                    len = self.len(),
+                    index = index - self.curr
+                );
+            }
             &self.source[index]
         }
     }
 
     impl<'a> AsciiSource<'a> {
-        /// Cut the first n chars of source
-        pub fn shift(&self, n: usize) -> AsciiSource {
-            AsciiSource {
-                source: &self.source[n..],
-                curr: 0,
+        /// Move the current head n chars towards the end. n will be clamped to len(source)
+        /// to prevent panics, this will return an empty slice.
+        pub fn shift(&mut self, n: usize) {
+            if n == 0 {
+                return;
+            }
+
+            self.curr = (self.curr + n).clamp(0, self.len);
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self.curr == self.len
+        }
+
+        pub fn source(&self) -> &[u8] {
+            &self.source[self.curr.clamp(0, self.len - 1)..]
+        }
+        pub fn len(&self) -> usize {
+            if self.is_empty() {
+                0
+            } else {
+                self.len - self.curr
             }
         }
-        pub fn source(&self) -> &[u8] {
-            &self.source
+        fn current_pos(&self) -> SourcePos {
+            // 1-indexing is normal for page positions
+            let mut row = 1;
+            let mut col = 1;
+
+            for (i, b) in self.source.iter().enumerate() {
+                if i == self.curr {
+                    break;
+                }
+                if *b == b'\n' {
+                    // On a newline, increment the row and reset the column.
+                    row += 1;
+                    col = 1;
+                } else {
+                    col += 1;
+                }
+            }
+
+            SourcePos {
+                row,
+                col: col.clamp(0, self.len),
+            }
         }
 
         pub fn build(source: &str) -> Result<AsciiSource, ScannerError> {
@@ -88,23 +141,100 @@ mod scanner {
             Ok(AsciiSource {
                 source: source.as_bytes(),
                 curr: 0,
+                len: source.len(),
             })
         }
     }
 
-    // impl<'a> Iterator for AsciiSource<'a> {
-    //     type Item = &'a u8;
-    //
-    //     fn next(&mut self) -> Option<Self::Item> {
-    //         self.curr += 1;
-    //         self.source.as_bytes().get(self.curr)
-    //     }
-    // }
+    pub struct Scanner<'a> {
+        source: AsciiSource<'a>,
+    }
+
+    impl<'a> Scanner<'a> {
+        fn peek(&self, n: usize) -> Option<u8> {
+            if n >= self.source.len() {
+                return None;
+            }
+
+            Some(self.source[n])
+        }
+
+        fn space(&mut self) {
+            loop {
+                match self.peek(0).unwrap_or(b'a') {
+                    b' ' | b'\n' | b'\t' | b'\r' => (),
+                    _ => break,
+                }
+                self.source.shift(1);
+            }
+        }
+
+        fn numbers(&mut self) -> Option<ScannerResult> {
+            let mut digits = String::new();
+            macro_rules! number_loop {
+                () => {
+                    loop {
+                        match self.peek(0) {
+                            Some(d) => {
+                                if d.is_ascii_digit() {
+                                    self.source.shift(1);
+                                    digits.push(d as char);
+                                } else {
+                                    break;
+                                }
+                            }
+                            None => break,
+                        }
+                    }
+                };
+            }
+
+            if self.source.is_empty() {
+                return None;
+            }
+
+            number_loop!();
+
+            match self.peek(0) {
+                Some(b'.') => {
+                    digits.push('.');
+                    self.source.shift(1);
+                    if !self.peek(0).map(|d| d.is_ascii_digit()).unwrap_or(false) {
+                        return Some(Err(ScannerError::UnexpectedCharacter(
+                            self.source.current_pos(),
+                        )));
+                    }
+                    number_loop!();
+                }
+                Some(_) => (),
+                None => (),
+            }
+
+            let a = digits.parse::<f64>();
+            Some(
+                a.map_err(|_| ScannerError::NumberParsingError)
+                    .map(|n| Token::Number(n)),
+            )
+
+            // Some(Err(ScannerError::default()))
+        }
+    }
+
+    impl<'a> Iterator for Scanner<'a> {
+        type Item = ScannerResult;
+        fn next(&mut self) -> Option<Self::Item> {
+            self.space();
+            self.numbers() //.or_else(|| self.numbers())
+        }
+    }
 
     #[derive(Debug, Default, PartialEq)]
     pub enum ScannerError {
         #[default]
         NonAsciiCharacer,
+        NumberParsingError,
+        UnexpectedCharacter(SourcePos),
+        UnterminatedString(SourcePos),
     }
 
     // Lexical Grammar for Lox
@@ -113,11 +243,11 @@ mod scanner {
     // IDENTIFIER     → ALPHA ( ALPHA | DIGIT )* ;
     // ALPHA          → "a" ... "z" | "A" ... "Z" | "_" ;
     // DIGIT          → "0" ... "9" ;
+    type ScannerResults = Vec<Result<Token, ScannerError>>;
 
-    fn numbers(source: AsciiSource) {}
-    /// Identifiers with reserved meaning
     #[derive(Debug, PartialEq)]
-    enum Keywords {
+    pub enum Token {
+        // Keywords
         And,
         Class,
         Else,
@@ -134,33 +264,7 @@ mod scanner {
         True,
         Var,
         While,
-    }
-
-    impl Display for Keywords {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Keywords::And => write!(f, "and"),
-                Keywords::Class => write!(f, "class"),
-                Keywords::Else => write!(f, "else"),
-                Keywords::False => write!(f, "false"),
-                Keywords::Fun => write!(f, "fun"),
-                Keywords::For => write!(f, "for"),
-                Keywords::If => write!(f, "if"),
-                Keywords::Nil => write!(f, "nil"),
-                Keywords::Or => write!(f, "or"),
-                Keywords::Print => write!(f, "print"),
-                Keywords::Return => write!(f, "return"),
-                Keywords::Super => write!(f, "super"),
-                Keywords::This => write!(f, "this"),
-                Keywords::True => write!(f, "true"),
-                Keywords::Var => write!(f, "var"),
-                Keywords::While => write!(f, "while"),
-            }
-        }
-    }
-
-    #[derive(Debug, PartialEq)]
-    enum Operators {
+        // Operators
         Minus,
         Plus,
         Semicolon,
@@ -174,83 +278,154 @@ mod scanner {
         Greaterequal,
         Less,
         Lessequal,
-    }
-
-    impl Display for Operators {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Operators::Minus => write!(f, "-"),
-                Operators::Plus => write!(f, "+"),
-                Operators::Semicolon => write!(f, ";"),
-                Operators::Slash => write!(f, "/"),
-                Operators::Star => write!(f, "*"),
-                Operators::Bang => write!(f, "!"),
-                Operators::BangEqual => write!(f, "!="),
-                Operators::Equal => write!(f, "="),
-                Operators::Equalequal => write!(f, "=="),
-                Operators::Greater => write!(f, ">"),
-                Operators::Greaterequal => write!(f, ">="),
-                Operators::Less => write!(f, "<"),
-                Operators::Lessequal => write!(f, "<="),
-            }
-        }
-    }
-
-    #[derive(Debug, PartialEq)]
-    enum Symbols {
+        // Symbols
         LeftParen,
         RightParen,
         LeftBrace,
         RightBrace,
         Comma,
         Dot,
-    }
-    impl Display for Symbols {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Symbols::LeftParen => write!(f, "("),
-                Symbols::RightParen => write!(f, ")"),
-                Symbols::LeftBrace => write!(f, "{{"),
-                Symbols::RightBrace => write!(f, "}}"),
-                Symbols::Comma => write!(f, ","),
-                Symbols::Dot => write!(f, "."),
-            }
-        }
-    }
-
-    enum Literals {
+        // Literals
         Identifier(String),
         String(String),
         Number(f64),
     }
-    impl Display for Literals {
+
+    impl Display for Token {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                Literals::Identifier(s) | Literals::String(s) => write!(f, "{s}"),
-                Literals::Number(n) => write!(f, "{n}"),
+                Token::LeftParen => write!(f, "("),
+                Token::RightParen => write!(f, ")"),
+                Token::LeftBrace => write!(f, "{{"),
+                Token::RightBrace => write!(f, "}}"),
+                Token::Comma => write!(f, ","),
+                Token::Dot => write!(f, "."),
+                Token::Minus => write!(f, "-"),
+                Token::Plus => write!(f, "+"),
+                Token::Semicolon => write!(f, ";"),
+                Token::Slash => write!(f, "/"),
+                Token::Star => write!(f, "*"),
+                Token::Bang => write!(f, "!"),
+                Token::BangEqual => write!(f, "!="),
+                Token::Equal => write!(f, "="),
+                Token::Equalequal => write!(f, "=="),
+                Token::Greater => write!(f, ">"),
+                Token::Greaterequal => write!(f, ">="),
+                Token::Less => write!(f, "<"),
+                Token::Lessequal => write!(f, "<="),
+                Token::And => write!(f, "and"),
+                Token::Class => write!(f, "class"),
+                Token::Else => write!(f, "else"),
+                Token::False => write!(f, "false"),
+                Token::Fun => write!(f, "fun"),
+                Token::For => write!(f, "for"),
+                Token::If => write!(f, "if"),
+                Token::Nil => write!(f, "nil"),
+                Token::Or => write!(f, "or"),
+                Token::Print => write!(f, "print"),
+                Token::Return => write!(f, "return"),
+                Token::Super => write!(f, "super"),
+                Token::This => write!(f, "this"),
+                Token::True => write!(f, "true"),
+                Token::Var => write!(f, "var"),
+                Token::While => write!(f, "while"),
+                Token::Identifier(s) | Token::String(s) => write!(f, "{s}"),
+                Token::Number(n) => write!(f, "{n}"),
             }
         }
     }
-}
 
-#[cfg(test)]
-mod scanner_tests {
-    use super::scanner;
+    #[cfg(test)]
+    mod scanner_tests {
+        use super::*;
+        use ScannerResult as SR;
 
-    #[test]
-    fn scan_errors() {
-        assert_eq!(
-            scanner::scan("hallö"),
-            Err(scanner::ScannerError::NonAsciiCharacer)
-        )
-    }
+        #[test]
+        fn scan_errors() {
+            assert_eq!(scan("hallö"), Err(ScannerError::NonAsciiCharacer))
+        }
 
-    #[test]
-    fn ascii_source() {
-        let src = scanner::AsciiSource::build("123456").unwrap();
-        assert_eq!(src.shift(2).source(), [b'3', b'4', b'5', b'6']);
+        #[test]
+        fn ascii_source_peek() {
+            let mut scanner = Scanner {
+                source: AsciiSource::build("abc").unwrap(),
+            };
+            assert_eq!(scanner.peek(0), Some(b'a'));
+            assert_eq!(scanner.peek(2), Some(b'c'));
+            assert_eq!(scanner.peek(4), None);
+        }
 
+        #[test]
+        fn ascii_source_access() {
+            let mut empty = AsciiSource::build("").unwrap();
+            let mut not_empty = AsciiSource::build("abc").unwrap();
+            assert!(empty.is_empty());
 
-        
+            empty.shift(12);
+            assert!(empty.is_empty());
+            assert_eq!(empty.len(), 0);
+
+            // [a, b, c] curr = 0
+            //  ^         shift(1)
+            // [a, b, c] curr = 1
+            //     ^
+            //     should act like [b, c]
+            assert!(!not_empty.is_empty());
+            assert_eq!(not_empty.len(), 3);
+            not_empty.shift(1);
+            assert_eq!(not_empty[0], b'b');
+            assert_eq!(not_empty.len(), 2);
+
+            not_empty.shift(2);
+            assert!(not_empty.is_empty());
+            assert_eq!(not_empty.len(), 0);
+
+            let mut not_empty = AsciiSource::build("abc").unwrap();
+            not_empty.shift(2);
+            assert_eq!(not_empty.len(), 1);
+            assert_eq!(not_empty[0], b'c');
+            not_empty.shift(1);
+            assert!(not_empty.is_empty());
+        }
+
+        #[test]
+        #[should_panic]
+        fn ascii_panic_index() {
+            let mut not_empty = AsciiSource::build("abc").unwrap();
+            not_empty.shift(3);
+            not_empty[0];
+        }
+
+        #[test]
+        fn ascii_source() {
+            let mut src = AsciiSource::build("123456").unwrap();
+            src.shift(2);
+            assert_eq!(src.source(), [b'3', b'4', b'5', b'6']);
+            src.shift(2);
+            assert_eq!(src.source(), [b'5', b'6']);
+        }
+
+        #[test]
+        fn scan_numbers() {
+            let mut empty_scanner = Scanner {
+                source: AsciiSource::build("").unwrap(),
+            };
+            assert_eq!(empty_scanner.next(), None);
+
+            let mut scanner = Scanner {
+                source: AsciiSource::build("42 3.14 3.0 0.5 0.").unwrap(),
+            };
+            assert_eq!(scanner.next().unwrap(), SR::Ok(Token::Number(42.0)));
+            assert_eq!(scanner.next().unwrap(), SR::Ok(Token::Number(3.14)));
+            assert_eq!(scanner.next().unwrap(), SR::Ok(Token::Number(3.0)));
+            assert_eq!(scanner.next().unwrap(), SR::Ok(Token::Number(0.5)));
+            assert_eq!(
+                scanner.next().unwrap(),
+                SR::Err(ScannerError::UnexpectedCharacter(SourcePos {
+                    row: 1,
+                    col: 18
+                }))
+            );
+        }
     }
 }
