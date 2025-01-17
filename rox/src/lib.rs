@@ -50,7 +50,6 @@ mod scanner {
 
     pub fn scan(source: &str) -> Result<(), ScannerError> {
         let source = AsciiSource::build(source)?;
-        dbg!(source);
 
         Ok(())
     }
@@ -150,7 +149,28 @@ mod scanner {
         source: AsciiSource<'a>,
     }
 
+    macro_rules! enum_from_str {
+        ($input:expr, $EnumType:ty, $( $Variant:ident ),+ $(,)?) => {{
+            let s = $input;
+            let mut found = None;
+            $(
+                if *s == format!("{}", <$EnumType>::$Variant) {
+                    found = Some(<$EnumType>::$Variant);
+                }
+            )+
+
+            found
+        }};
+    }
+
     impl<'a> Scanner<'a> {
+        // Lexical Grammar for Lox
+        // NUMBER         → DIGIT+ ( "." DIGIT+ )? ;
+        // STRING         → "\"" <any char except "\"">* "\"" ;
+        // IDENTIFIER     → ALPHA ( ALPHA | DIGIT )* ;
+        // ALPHA          → "a" ... "z" | "A" ... "Z" | "_" ;
+        // DIGIT          → "0" ... "9" ;
+
         fn peek(&self, n: usize) -> Option<u8> {
             if n >= self.source.len() {
                 return None;
@@ -159,17 +179,133 @@ mod scanner {
             Some(self.source[n])
         }
 
-        fn space(&mut self) {
+        fn skip_space(&mut self) {
             loop {
                 match self.peek(0).unwrap_or(b'a') {
-                    b' ' | b'\n' | b'\t' | b'\r' => (),
+                    b' ' | b'\n' | b'\t' | b'\r' => self.source.shift(1),
                     _ => break,
                 }
-                self.source.shift(1);
             }
         }
 
+        fn double_char(&mut self) -> Option<ScannerResult> {
+            self.skip_space();
+            if self.source.is_empty() || self.source.len() < 2 {
+                return None;
+            }
+
+            let mut op = String::new();
+            op.push(self.peek(0).expect("length checked!") as char);
+            op.push(self.peek(1).expect("length checked!") as char);
+
+            enum_from_str!(op, Token, BangEqual, Equalequal, Lessequal, Greaterequal).map(|t| Ok(t))
+        }
+
+        fn identifiers(&mut self) -> Option<ScannerResult> {
+            self.skip_space();
+
+            fn alpha(d: &u8) -> bool {
+                d.is_ascii_alphabetic() || *d == b'_'
+            }
+
+            fn alpha_num(d: &u8) -> bool {
+                alpha(d) || d.is_ascii_digit()
+            }
+
+            if self.source.is_empty() || self.peek(0).map(|d| !alpha(&d)).unwrap_or(false) {
+                return None;
+            }
+
+            let mut identifier = String::new();
+
+            //Consume first letter
+            identifier.push(self.peek(0).expect("Element peeked before!") as char);
+            self.source.shift(1);
+
+            loop {
+                match self.peek(0) {
+                    None => break,
+
+                    Some(d) => {
+                        if alpha_num(&d) {
+                            dbg!(d);
+                            identifier.push(d as char);
+                            self.source.shift(1);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let keyword = enum_from_str!(
+                &identifier,
+                Token,
+                And,
+                Class,
+                Else,
+                False,
+                Fun,
+                For,
+                If,
+                Nil,
+                Or,
+                Print,
+                Return,
+                Super,
+                This,
+                True,
+                Var,
+                While
+            );
+
+            match keyword {
+                None => Some(Ok(Token::Identifier(identifier))),
+                Some(k) => Some(Ok(k)),
+            }
+        }
+
+        fn strings(&mut self) -> Option<ScannerResult> {
+            self.skip_space();
+
+            if self.source.is_empty() || self.peek(0).map(|d| !(d == b'"')).unwrap_or(false) {
+                return None;
+            }
+
+            //Consume "
+            self.source.shift(1);
+
+            let mut string = String::new();
+
+            loop {
+                match self.peek(0) {
+                    Some(b'"') => {
+                        self.source.shift(1);
+                        break;
+                    }
+                    None | Some(b'\n') => {
+                        return Some(Err(ScannerError::UnterminatedString(
+                            self.source.current_pos(),
+                        )));
+                    }
+                    Some(d) => {
+                        string.push(d as char);
+                        self.source.shift(1);
+                    }
+                }
+            }
+
+            Some(Ok(Token::String(string)))
+        }
+
         fn numbers(&mut self) -> Option<ScannerResult> {
+            self.skip_space();
+
+            if self.source.is_empty() || self.peek(0).map(|d| !d.is_ascii_digit()).unwrap_or(false)
+            {
+                return None;
+            }
+
             let mut digits = String::new();
             macro_rules! number_loop {
                 () => {
@@ -189,10 +325,6 @@ mod scanner {
                 };
             }
 
-            if self.source.is_empty() {
-                return None;
-            }
-
             number_loop!();
 
             match self.peek(0) {
@@ -200,9 +332,9 @@ mod scanner {
                     digits.push('.');
                     self.source.shift(1);
                     if !self.peek(0).map(|d| d.is_ascii_digit()).unwrap_or(false) {
-                        return Some(Err(ScannerError::UnexpectedCharacter(
-                            self.source.current_pos(),
-                        )));
+                        let pos = self.source.current_pos();
+                        self.source.shift(1);
+                        return Some(Err(ScannerError::UnexpectedCharacter(pos)));
                     }
                     number_loop!();
                 }
@@ -210,9 +342,14 @@ mod scanner {
                 None => (),
             }
 
-            let a = digits.parse::<f64>();
+            if digits.is_empty() {
+                return None;
+            }
+
             Some(
-                a.map_err(|_| ScannerError::NumberParsingError)
+                digits
+                    .parse::<f64>()
+                    .map_err(|_| ScannerError::NumberParsingError)
                     .map(|n| Token::Number(n)),
             )
 
@@ -223,8 +360,9 @@ mod scanner {
     impl<'a> Iterator for Scanner<'a> {
         type Item = ScannerResult;
         fn next(&mut self) -> Option<Self::Item> {
-            self.space();
-            self.numbers() //.or_else(|| self.numbers())
+            self.numbers()
+                .or_else(|| self.strings())
+                .or_else(|| self.identifiers())
         }
     }
 
@@ -237,12 +375,6 @@ mod scanner {
         UnterminatedString(SourcePos),
     }
 
-    // Lexical Grammar for Lox
-    // NUMBER         → DIGIT+ ( "." DIGIT+ )? ;
-    // STRING         → "\"" <any char except "\"">* "\"" ;
-    // IDENTIFIER     → ALPHA ( ALPHA | DIGIT )* ;
-    // ALPHA          → "a" ... "z" | "A" ... "Z" | "_" ;
-    // DIGIT          → "0" ... "9" ;
     type ScannerResults = Vec<Result<Token, ScannerError>>;
 
     #[derive(Debug, PartialEq)]
@@ -342,7 +474,24 @@ mod scanner {
 
         #[test]
         fn scan_errors() {
-            assert_eq!(scan("hallö"), Err(ScannerError::NonAsciiCharacer))
+            assert_eq!(scan("hallö"), Err(ScannerError::NonAsciiCharacer));
+            let mut errors = Scanner {
+                source: AsciiSource::build("5.s\n 0.x").unwrap(),
+            };
+            assert_eq!(
+                errors.next(),
+                Some(Err(ScannerError::UnexpectedCharacter(SourcePos {
+                    row: 1,
+                    col: 3
+                })))
+            );
+            assert_eq!(
+                errors.next(),
+                Some(Err(ScannerError::UnexpectedCharacter(SourcePos {
+                    row: 2,
+                    col: 4
+                })))
+            );
         }
 
         #[test]
@@ -415,16 +564,58 @@ mod scanner {
             let mut scanner = Scanner {
                 source: AsciiSource::build("42 3.14 3.0 0.5 0.").unwrap(),
             };
-            assert_eq!(scanner.next().unwrap(), SR::Ok(Token::Number(42.0)));
-            assert_eq!(scanner.next().unwrap(), SR::Ok(Token::Number(3.14)));
-            assert_eq!(scanner.next().unwrap(), SR::Ok(Token::Number(3.0)));
-            assert_eq!(scanner.next().unwrap(), SR::Ok(Token::Number(0.5)));
+            assert_eq!(scanner.next(), Some(SR::Ok(Token::Number(42.0))));
+            assert_eq!(scanner.next(), Some(SR::Ok(Token::Number(3.14))));
+            assert_eq!(scanner.next(), Some(SR::Ok(Token::Number(3.0))));
+            assert_eq!(scanner.next(), Some(SR::Ok(Token::Number(0.5))));
             assert_eq!(
                 scanner.next().unwrap(),
                 SR::Err(ScannerError::UnexpectedCharacter(SourcePos {
                     row: 1,
                     col: 18
                 }))
+            );
+        }
+
+        #[test]
+        fn scan_identifiers() {
+            let mut empty_scanner = Scanner {
+                source: AsciiSource::build("").unwrap(),
+            };
+            assert_eq!(empty_scanner.next(), None);
+
+            let mut strings = Scanner {
+                source: AsciiSource::build("5 \"This is a string\" AvarIable anoter_var556")
+                    .unwrap(),
+            };
+            assert!(strings.next().unwrap().is_ok());
+            assert!(strings.next().unwrap().is_ok());
+
+            assert_eq!(
+                strings.next(),
+                Some(SR::Ok(Token::Identifier("AvarIable".to_owned())))
+            );
+            assert_eq!(
+                strings.next(),
+                Some(SR::Ok(Token::Identifier("anoter_var556".to_owned())))
+            );
+        }
+
+        #[test]
+        fn scan_string() {
+            let mut empty_scanner = Scanner {
+                source: AsciiSource::build("").unwrap(),
+            };
+            assert_eq!(empty_scanner.next(), None);
+
+            let mut strings = Scanner {
+                source: AsciiSource::build("5 \"This is a string\"").unwrap(),
+            };
+            assert!(strings.next().unwrap().is_ok());
+
+            assert_eq!(
+                strings.next(),
+                Some(SR::Ok(Token::String("This is a string".to_owned())))
             );
         }
     }
