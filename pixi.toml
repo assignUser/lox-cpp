@@ -8,8 +8,9 @@ version = "0.1.0"
 
 [tasks]
 build_cpp = "just"
+build_rs = { cmd = "cargo build", cwd = "rox/" }
 cppval = { cmd = "dart tool/bin/test.dart chap13_inheritance -i $PIXI_PROJECT_ROOT/build/lox/lox", cwd = "build/_deps/lox_tests-src" }
-rsval = { cmd = "dart tool/bin/test.dart chap13_inheritance -i  $PIXI_PROJECT_ROOT/rox/target/debug/rox", cwd = "build/_deps/lox_tests-src" }
+rsval = { cmd = "dart tool/bin/test.dart chap04_scanning -i  $PIXI_PROJECT_ROOT/rox/target/debug/rox", cwd = "build/_deps/lox_tests-src" , depends_on = ["build_rs"]}
 
 [dependencies]
 dart-sdk = ">=2.18.2,<3"
