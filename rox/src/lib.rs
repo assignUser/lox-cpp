@@ -1,4 +1,5 @@
 mod scanner;
+mod parser;
 use scanner::ScannerError;
 
 #[derive(Debug)]

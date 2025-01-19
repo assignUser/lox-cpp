@@ -6,7 +6,7 @@ pub fn scan(source: &str) -> Result<ScannerResults, ScannerError> {
     Ok(scanner.collect::<ScannerResults>())
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub struct SourcePos {
     row: usize,
     col: usize,
@@ -57,7 +57,8 @@ impl AsciiSource<'_> {
             self.len - self.curr
         }
     }
-    fn current_pos(&self) -> SourcePos {
+
+    fn current_pos(&self, offset: usize) -> SourcePos {
         // 1-indexing is normal for page positions
         let mut row = 1;
         let mut col = 1;
@@ -77,7 +78,7 @@ impl AsciiSource<'_> {
 
         SourcePos {
             row,
-            col: col.clamp(0, self.len),
+            col: (col - offset).clamp(0, self.len),
         }
     }
 
@@ -100,15 +101,17 @@ pub struct Scanner<'a> {
 }
 
 macro_rules! token_from_str {
-        ($input:expr, $EnumType:ty, $( $Variant:ident ),+ $(,)?) => {{
+       ($input:expr,$pos:expr, $( $Variant:ident(SourcePos) ),+ $(,)?) => {{
             let s = $input;
             let mut found = None;
             $(
-                if *s == *format!("{}", <$EnumType>::$Variant).split(' ').nth(1).unwrap_or(" ")
-{
-                    found = Some(<$EnumType>::$Variant);
+                // Construct a temp instance of the variant using `Default`
+                // and compare its Display output to the input string.
+                if *s == *format!("{}", Token::$Variant(<SourcePos>::default())).split(' ').nth(1).unwrap_or(" ") {
+                    found = Some(<Token>::$Variant($pos.clone()));
                 }
             )+
+
 
             found
         }};
@@ -182,23 +185,45 @@ impl Scanner<'_> {
             self.peek(0).expect("length checked!") as char,
             self.peek(1).unwrap_or(b' ') as char
         );
-
-        token_from_str!(&op, Token, BangEqual, EqualEqual, LessEqual, GreaterEqual)
+        dbg!(&op);
+        token_from_str!(
+            &op,
+            self.source.current_pos(0),
+            BangEqual(SourcePos),
+            EqualEqual(SourcePos),
+            LessEqual(SourcePos),
+            GreaterEqual(SourcePos)
+        )
+        .map(|t| {
+            self.source.shift(2);
+            Ok(t)
+        })
+        .or_else(|| {
+            op.truncate(1);
+            token_from_str!(
+                op,
+                self.source.current_pos(0),
+                Minus(SourcePos),
+                Plus(SourcePos),
+                Semicolon(SourcePos),
+                Slash(SourcePos),
+                Star(SourcePos),
+                Bang(SourcePos),
+                Equal(SourcePos),
+                Greater(SourcePos),
+                Less(SourcePos),
+                LeftParen(SourcePos),
+                RightParen(SourcePos),
+                LeftBrace(SourcePos),
+                RightBrace(SourcePos),
+                Comma(SourcePos),
+                Dot(SourcePos)
+            )
             .map(|t| {
-                self.source.shift(2);
+                self.source.shift(1);
                 Ok(t)
             })
-            .or_else(|| {
-                op.truncate(1);
-                token_from_str!(
-                    op, Token, Minus, Plus, Semicolon, Slash, Star, Bang, Equal, Greater, Less,
-                    LeftParen, RightParen, LeftBrace, RightBrace, Comma, Dot
-                )
-                .map(|t| {
-                    self.source.shift(1);
-                    Ok(t)
-                })
-            })
+        })
     }
 
     fn identifiers(&mut self) -> Option<ScannerResult> {
@@ -237,27 +262,30 @@ impl Scanner<'_> {
 
         let keyword = token_from_str!(
             &identifier,
-            Token,
-            And,
-            Class,
-            Else,
-            False,
-            Fun,
-            For,
-            If,
-            Nil,
-            Or,
-            Print,
-            Return,
-            Super,
-            This,
-            True,
-            Var,
-            While
+            self.source.current_pos(identifier.len()),
+            And(SourcePos),
+            Class(SourcePos),
+            Else(SourcePos),
+            False(SourcePos),
+            Fun(SourcePos),
+            For(SourcePos),
+            If(SourcePos),
+            Nil(SourcePos),
+            Or(SourcePos),
+            Print(SourcePos),
+            Return(SourcePos),
+            Super(SourcePos),
+            This(SourcePos),
+            True(SourcePos),
+            Var(SourcePos),
+            While(SourcePos)
         );
 
         match keyword {
-            None => Some(Ok(Token::Identifier(identifier))),
+            None => Some(Ok(Token::Identifier {
+                pos: self.source.current_pos(identifier.len()),
+                ident: identifier,
+            })),
             Some(k) => Some(Ok(k)),
         }
     }
@@ -280,7 +308,7 @@ impl Scanner<'_> {
                 }
                 None | Some(b'\n') => {
                     return Some(Err(ScannerError::UnterminatedString(
-                        self.source.current_pos(),
+                        self.source.current_pos(0),
                     )));
                 }
                 Some(d) => {
@@ -290,7 +318,10 @@ impl Scanner<'_> {
             }
         }
 
-        Some(Ok(Token::String(string)))
+        Some(Ok(Token::String {
+            pos: self.source.current_pos(string.len() + 2), // add 2 for the quotes
+            string,
+        }))
     }
 
     fn numbers(&mut self) -> Option<ScannerResult> {
@@ -339,7 +370,10 @@ impl Scanner<'_> {
             digits
                 .parse::<f64>()
                 .map_err(|_| ScannerError::NumberParsingError)
-                .map(Token::Number),
+                .map(|v| Token::Number {
+                    value: v,
+                    pos: self.source.current_pos(digits.len()),
+                }),
         )
     }
 }
@@ -370,7 +404,7 @@ impl Iterator for Scanner<'_> {
                 } else {
                     // or unparsable characters where found
                     let res = Some(Err(ScannerError::UnexpectedCharacter(
-                        self.source.current_pos(),
+                        self.source.current_pos(0),
                     )));
                     // consume the character
                     self.source.shift(1);
@@ -392,99 +426,99 @@ pub enum ScannerError {
 
 type ScannerResults = Vec<Result<Token, ScannerError>>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     // Keywords
-    And,
-    Class,
-    Else,
-    False,
-    Fun,
-    For,
-    If,
-    Nil,
-    Or,
-    Print,
-    Return,
-    Super,
-    This,
-    True,
-    Var,
-    While,
+    And(SourcePos),
+    Class(SourcePos),
+    Else(SourcePos),
+    False(SourcePos),
+    Fun(SourcePos),
+    For(SourcePos),
+    If(SourcePos),
+    Nil(SourcePos),
+    Or(SourcePos),
+    Print(SourcePos),
+    Return(SourcePos),
+    Super(SourcePos),
+    This(SourcePos),
+    True(SourcePos),
+    Var(SourcePos),
+    While(SourcePos),
     // Operators
-    Minus,
-    Plus,
-    Semicolon,
-    Slash,
-    Star,
-    Bang,
-    BangEqual,
-    Equal,
-    EqualEqual,
-    Greater,
-    GreaterEqual,
-    Less,
-    LessEqual,
+    Minus(SourcePos),
+    Plus(SourcePos),
+    Semicolon(SourcePos),
+    Slash(SourcePos),
+    Star(SourcePos),
+    Bang(SourcePos),
+    BangEqual(SourcePos),
+    Equal(SourcePos),
+    EqualEqual(SourcePos),
+    Greater(SourcePos),
+    GreaterEqual(SourcePos),
+    Less(SourcePos),
+    LessEqual(SourcePos),
     // Symbols
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    Comma,
-    Dot,
+    LeftParen(SourcePos),
+    RightParen(SourcePos),
+    LeftBrace(SourcePos),
+    RightBrace(SourcePos),
+    Comma(SourcePos),
+    Dot(SourcePos),
     // Literals
-    Identifier(String),
-    String(String),
-    Number(f64),
+    Identifier { ident: String, pos: SourcePos },
+    String { string: String, pos: SourcePos },
+    Number { value: f64, pos: SourcePos },
     Eof,
 }
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::LeftParen => write!(f, "LEFT_PAREN ( null"),
-            Token::RightParen => write!(f, "RIGHT_PAREN ) null"),
-            Token::LeftBrace => write!(f, "LEFT_BRACE {{ null"),
-            Token::RightBrace => write!(f, "RIGHT_BRACE }} null"),
-            Token::Comma => write!(f, "COMMA , null"),
-            Token::Dot => write!(f, "DOT . null"),
-            Token::Minus => write!(f, "MINUS - null"),
-            Token::Plus => write!(f, "PLUS + null"),
-            Token::Semicolon => write!(f, "SEMICOLON ; null"),
-            Token::Slash => write!(f, "SLASH / null"),
-            Token::Star => write!(f, "STAR * null"),
-            Token::Bang => write!(f, "BANG ! null"),
-            Token::BangEqual => write!(f, "BANG_EQUAL != null"),
-            Token::Equal => write!(f, "EQUAL = null"),
-            Token::EqualEqual => write!(f, "EQUAL_EQUAL == null"),
-            Token::Greater => write!(f, "GREATER > null"),
-            Token::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
-            Token::Less => write!(f, "LESS < null"),
-            Token::LessEqual => write!(f, "LESS_EQUAL <= null"),
-            Token::And => write!(f, "AND and null"),
-            Token::Class => write!(f, "CLASS class null"),
-            Token::Else => write!(f, "ELSE else null"),
-            Token::False => write!(f, "FALSE false null"),
-            Token::Fun => write!(f, "FUN fun null"),
-            Token::For => write!(f, "FOR for null"),
-            Token::If => write!(f, "IF if null"),
-            Token::Nil => write!(f, "NIL nil null"),
-            Token::Or => write!(f, "OR or null"),
-            Token::Print => write!(f, "PRINT print null"),
-            Token::Return => write!(f, "RETURN return null"),
-            Token::Super => write!(f, "SUPER super null"),
-            Token::This => write!(f, "THIS this null"),
-            Token::True => write!(f, "TRUE true null"),
-            Token::Var => write!(f, "VAR var null"),
-            Token::While => write!(f, "WHILE while null"),
-            Token::Identifier(s) => write!(f, "IDENTIFIER {s} null"),
-            Token::String(s) => write!(f, "STRING \"{s}\" {s}"),
-            Token::Number(n) => {
+            Token::LeftParen(_pos) => write!(f, "LEFT_PAREN ( null"),
+            Token::RightParen(_pos) => write!(f, "RIGHT_PAREN ) null"),
+            Token::LeftBrace(_pos) => write!(f, "LEFT_BRACE {{ null"),
+            Token::RightBrace(_pos) => write!(f, "RIGHT_BRACE }} null"),
+            Token::Comma(_pos) => write!(f, "COMMA , null"),
+            Token::Dot(_pos) => write!(f, "DOT . null"),
+            Token::Minus(_pos) => write!(f, "MINUS - null"),
+            Token::Plus(_pos) => write!(f, "PLUS + null"),
+            Token::Semicolon(_pos) => write!(f, "SEMICOLON ; null"),
+            Token::Slash(_pos) => write!(f, "SLASH / null"),
+            Token::Star(_pos) => write!(f, "STAR * null"),
+            Token::Bang(_pos) => write!(f, "BANG ! null"),
+            Token::BangEqual(_pos) => write!(f, "BANG_EQUAL != null"),
+            Token::Equal(_pos) => write!(f, "EQUAL = null"),
+            Token::EqualEqual(_pos) => write!(f, "EQUAL_EQUAL == null"),
+            Token::Greater(_pos) => write!(f, "GREATER > null"),
+            Token::GreaterEqual(_pos) => write!(f, "GREATER_EQUAL >= null"),
+            Token::Less(_pos) => write!(f, "LESS < null"),
+            Token::LessEqual(_pos) => write!(f, "LESS_EQUAL <= null"),
+            Token::And(_pos) => write!(f, "AND and null"),
+            Token::Class(_pos) => write!(f, "CLASS class null"),
+            Token::Else(_pos) => write!(f, "ELSE else null"),
+            Token::False(_pos) => write!(f, "FALSE false null"),
+            Token::Fun(_pos) => write!(f, "FUN fun null"),
+            Token::For(_pos) => write!(f, "FOR for null"),
+            Token::If(_pos) => write!(f, "IF if null"),
+            Token::Nil(_pos) => write!(f, "NIL nil null"),
+            Token::Or(_pos) => write!(f, "OR or null"),
+            Token::Print(_pos) => write!(f, "PRINT print null"),
+            Token::Return(_pos) => write!(f, "RETURN return null"),
+            Token::Super(_pos) => write!(f, "SUPER super null"),
+            Token::This(_pos) => write!(f, "THIS this null"),
+            Token::True(_pos) => write!(f, "TRUE true null"),
+            Token::Var(_pos) => write!(f, "VAR var null"),
+            Token::While(_pos) => write!(f, "WHILE while null"),
+            Token::Identifier { ident, pos: _ } => write!(f, "IDENTIFIER {ident} null"),
+            Token::String { string, pos: _ } => write!(f, "STRING \"{string}\" {string}"),
+            Token::Number { value, pos: _ } => {
                 // This is to match jlox's expectation
-                if n.fract() == 0.0 {
-                    write!(f, "NUMBER {} {}.0", n, *n as i64)
+                if value.fract() == 0.0 {
+                    write!(f, "NUMBER {} {}.0", value, *value as i64)
                 } else {
-                    write!(f, "NUMBER {n} {n}")
+                    write!(f, "NUMBER {value} {value}")
                 }
             }
             Token::Eof => write!(f, "EOF  null"),
@@ -588,11 +622,41 @@ mod scanner_tests {
             source: AsciiSource::build("42 3.15 3.0 0.5 0.").unwrap(),
         };
 
-        assert_eq!(scanner.next(), Some(SR::Ok(Token::Number(42.0))));
-        assert_eq!(scanner.next(), Some(SR::Ok(Token::Number(3.15))));
-        assert_eq!(scanner.next(), Some(SR::Ok(Token::Number(3.0))));
-        assert_eq!(scanner.next(), Some(SR::Ok(Token::Number(0.5))));
-        assert_eq!(scanner.next(), Some(SR::Ok(Token::Number(0.0))));
+        assert_eq!(
+            scanner.next(),
+            Some(SR::Ok(Token::Number {
+                value: 42.0,
+                pos: SourcePos { row: 1, col: 1 }
+            }))
+        );
+        assert_eq!(
+            scanner.next(),
+            Some(SR::Ok(Token::Number {
+                value: 3.15,
+                pos: SourcePos { row: 1, col: 4 }
+            }))
+        );
+        assert_eq!(
+            scanner.next(),
+            Some(SR::Ok(Token::Number {
+                value: 3.0,
+                pos: SourcePos { row: 1, col: 9 }
+            }))
+        );
+        assert_eq!(
+            scanner.next(),
+            Some(SR::Ok(Token::Number {
+                value: 0.5,
+                pos: SourcePos { row: 1, col: 13 }
+            }))
+        );
+        assert_eq!(
+            scanner.next(),
+            Some(SR::Ok(Token::Number {
+                value: 0.0,
+                pos: SourcePos { row: 1, col: 17 }
+            }))
+        );
     }
 
     #[test]
@@ -610,11 +674,17 @@ mod scanner_tests {
 
         assert_eq!(
             strings.next(),
-            Some(SR::Ok(Token::Identifier("AvarIable".to_owned())))
+            Some(SR::Ok(Token::Identifier {
+                ident: "AvarIable".to_owned(),
+                pos: SourcePos { row: 1, col: 22 }
+            }))
         );
         assert_eq!(
             strings.next(),
-            Some(SR::Ok(Token::Identifier("anoter_var556".to_owned())))
+            Some(SR::Ok(Token::Identifier {
+                ident: "anoter_var556".to_owned(),
+                pos: SourcePos { row: 1, col: 32 }
+            }))
         );
     }
 
@@ -632,7 +702,10 @@ mod scanner_tests {
 
         assert_eq!(
             strings.next(),
-            Some(SR::Ok(Token::String("This is a string".to_owned())))
+            Some(SR::Ok(Token::String {
+                string: "This is a string".to_owned(),
+                pos: SourcePos { row: 1, col: 3 }
+            }))
         );
     }
 
@@ -646,8 +719,16 @@ mod scanner_tests {
         let mut comments = Scanner {
             source: AsciiSource::build("// 42  \n   ==// != variable >=\n \r\t//\n\nvar").unwrap(),
         };
-        assert_eq!(comments.next(), Some(SR::Ok(Token::EqualEqual)));
-        assert_eq!(comments.next(), Some(SR::Ok(Token::Var)));
+
+        assert_eq!(
+            comments.next(),
+            Some(SR::Ok(Token::EqualEqual(SourcePos { row: 2, col: 4 })))
+        );
+
+        assert_eq!(
+            comments.next(),
+            Some(SR::Ok(Token::Var(SourcePos { row: 5, col: 1 })))
+        );
     }
 
     #[test]
@@ -661,26 +742,86 @@ mod scanner_tests {
             source: AsciiSource::build(" ! != = == < <= >= > / + - * ; , . () {{  }").unwrap(),
         };
 
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Bang)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::BangEqual)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Equal)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::EqualEqual)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Less)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::LessEqual)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::GreaterEqual)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Greater)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Slash)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Plus)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Minus)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Star)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Semicolon)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Comma)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::Dot)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::LeftParen)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::RightParen)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::LeftBrace)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::LeftBrace)));
-        assert_eq!(double_ops.next(), Some(SR::Ok(Token::RightBrace)));
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Bang(SourcePos { row: 1, col: 2 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::BangEqual(SourcePos { row: 1, col: 4 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Equal(SourcePos { row: 1, col: 7 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::EqualEqual(SourcePos { row: 1, col: 9 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Less(SourcePos { row: 1, col: 12 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::LessEqual(SourcePos { row: 1, col: 14 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::GreaterEqual(SourcePos { row: 1, col: 17 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Greater(SourcePos { row: 1, col: 20 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Slash(SourcePos { row: 1, col: 22 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Plus(SourcePos { row: 1, col: 24 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Minus(SourcePos { row: 1, col: 26 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Star(SourcePos { row: 1, col: 28 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Semicolon(SourcePos { row: 1, col: 30 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Comma(SourcePos { row: 1, col: 32 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::Dot(SourcePos { row: 1, col: 34 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::LeftParen(SourcePos { row: 1, col: 36 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::RightParen(SourcePos { row: 1, col: 37 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::LeftBrace(SourcePos { row: 1, col: 39 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::LeftBrace(SourcePos { row: 1, col: 40 })))
+        );
+        assert_eq!(
+            double_ops.next(),
+            Some(SR::Ok(Token::RightBrace(SourcePos { row: 1, col: 43 })))
+        );
         assert_eq!(double_ops.next(), None);
     }
 }
