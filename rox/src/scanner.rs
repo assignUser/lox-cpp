@@ -10,8 +10,8 @@ pub fn scan(source: &str) -> Result<ScannerResults, ScannerError> {
 
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct SourcePos {
-    row: usize,
-    col: usize,
+    pub row: usize,
+    pub col: usize,
 }
 
 impl fmt::Display for SourcePos {

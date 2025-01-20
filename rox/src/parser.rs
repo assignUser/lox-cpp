@@ -1,5 +1,5 @@
 use core::slice::Iter;
-use std::iter::Peekable;
+use std::{fmt::Display, iter::Peekable};
 
 use crate::scanner::{SourcePos, Token};
 
@@ -10,22 +10,23 @@ pub struct Identifier {
 }
 
 #[derive(Debug)]
-pub enum Declaration {
-    Class(Class),
-    Function(Function),
-    Var(Var),
-    Statement(Statement),
-}
-
-#[derive(Debug)]
 pub enum Statement {
-    Block,
+    Block(Block),
     Expression(Expression),
     For,
     If,
     Print(Expression),
     Return,
     While,
+    Class(Class),
+    Function(Function),
+    Var(Var),
+}
+
+#[derive(Debug)]
+pub struct Block {
+    body: Vec<Statement>,
+    key: SourcePos,
 }
 
 #[derive(Debug)]
@@ -39,13 +40,13 @@ pub struct Class {
 pub struct Function {
     name: Identifier,
     parameters: Option<Vec<Identifier>>,
-    body: Vec<Statement>,
+    body: Block,
 }
 
 #[derive(Debug)]
 pub struct Var {
     name: Identifier,
-    expr: Expression,
+    initializer: Option<Expression>,
 }
 
 #[derive(Debug)]
@@ -93,12 +94,23 @@ pub enum Expression {
     Literal(Value),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Value {
     Boolean { value: bool, pos: SourcePos },
     Nil(SourcePos),
     Number { value: f64, pos: SourcePos },
     String { value: String, pos: SourcePos },
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Boolean { value, .. } => write!(f, "{value}"),
+            Self::String { value, .. } => write!(f, "{value}"),
+            Self::Nil(_) => write!(f, "nil"),
+            Self::Number { value, .. } => write!(f, "{value}"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -144,6 +156,26 @@ macro_rules! binary_expression {
 }
 
 macro_rules! consume {
+    (
+        $self:ident,
+        $variant:ident $pattern:tt,
+        (),
+        $message:expr
+    ) => {{
+        let token = $self.iter.next();
+        match token {
+            None => Err(ParserError::UnexpectedEof),
+            #[allow(unused_variables)]
+            Some(t @ Token::$variant $pattern) => {
+                Ok(t)
+            }
+            Some(t) => Err(ParserError::UnexpectedToken {
+                token: t.clone(),
+                message: $message.to_string(),
+            }),
+        }
+    }};
+
     (
         $self:ident,
         $variant:ident $pattern:tt,
@@ -257,7 +289,7 @@ impl<'a> Parser<'a> {
         if decl.is_err() {
             self.synchronize();
         }
-
+        dbg!(&decl);
         decl
     }
     fn class(&mut self) -> Result<Statement, ParserError> {
@@ -266,9 +298,45 @@ impl<'a> Parser<'a> {
     fn function(&mut self) -> Result<Statement, ParserError> {
         Err(ParserError::Error)
     }
+
     fn variable(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
+        let name = consume!(
+            self,
+            Identifier { ident, pos },
+            (ident.clone(), pos.clone()),
+            "Expect Variable name."
+        )?;
+        let mut initializer: Option<Expression> = None;
+
+        if let Token::Equal(_) = self.peek() {
+            self.iter.next();
+            initializer = match self.expression()? {
+                Statement::Expression(expr) => Some(expr),
+                stmt => {
+                    return Err(ParserError::UnexpectedStatement {
+                        stmt,
+                        message: "Expect expression as initializer.".to_string(),
+                    })
+                }
+            };
+        }
+
+        consume!(
+            self,
+            Semicolon(pos),
+            (),
+            "Expect ';' after variable declaration."
+        )?;
+
+        Ok(Statement::Var(Var {
+            name: Identifier {
+                name: name.0,
+                pos: name.1,
+            },
+            initializer,
+        }))
     }
+
     fn statement(&mut self) -> Result<Statement, ParserError> {
         match self.peek() {
             Token::For(_) => {
@@ -291,16 +359,16 @@ impl<'a> Parser<'a> {
                 self.iter.next();
                 self.while_stmt()
             }
-            Token::LeftBrace(_) => {
+            Token::LeftBrace(pos) => {
+                let key = pos.clone();
                 self.iter.next();
-                self.block()
+                self.block_stmt(key)
             }
             _ => self.expr_stmt(),
         }
     }
     fn expr_stmt(&mut self) -> Result<Statement, ParserError> {
         let expr = self.expression()?;
-
         match self.iter.next().unwrap_or(&Token::Eof) {
             Token::Semicolon(_) => Ok(expr),
             t => {
@@ -345,8 +413,20 @@ impl<'a> Parser<'a> {
     fn while_stmt(&mut self) -> Result<Statement, ParserError> {
         Err(ParserError::Error)
     }
-    fn block(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
+
+    fn block_stmt(&mut self, key: SourcePos) -> Result<Statement, ParserError> {
+        let mut stmts = vec![];
+
+        loop {
+            match self.peek() {
+                Token::Eof | Token::RightBrace(_) => break,
+                _ => stmts.push(self.declaration()?),
+            }
+        }
+
+        consume!(self, RightBrace(_pos), _pos, "Expect '}' after block.")?;
+
+        Ok(Statement::Block(Block { body: stmts, key }))
     }
 
     fn box_expression(&self, stmt: Statement) -> Result<Box<Expression>, ParserError> {
@@ -599,10 +679,6 @@ impl<'a> Parser<'a> {
             Token::LeftParen(_) => {
                 let expr = self.expression()?;
                 consume!(self, RightParen(_pos), _pos, "Expect ')' after expression.")?;
-                // ExprPtr expr = expression();
-                // // consume should use unexpected?
-                // consume(Token::Type::RIGHT_PAREN, "Expect ')' after expression.");
-                // return Grouping::make(std::move(expr));
                 Statement::Expression(Expression::Grouping {
                     expr: self.box_expression(expr)?,
                 })
