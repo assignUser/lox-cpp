@@ -23,7 +23,7 @@ pub enum Statement {
     Expression(Expression),
     For,
     If,
-    Print,
+    Print(Expression),
     Return,
     While,
 }
@@ -322,9 +322,23 @@ impl<'a> Parser<'a> {
     fn if_stmt(&mut self) -> Result<Statement, ParserError> {
         Err(ParserError::Error)
     }
+
     fn print_stmt(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
+        let value = match self.expression()? {
+            Statement::Expression(expr) => expr,
+            stmt => {
+                return Err(ParserError::UnexpectedStatement {
+                    stmt,
+                    message: "Expect expression after 'print'".to_string(),
+                });
+            }
+        };
+
+        consume!(self, Semicolon(_pos), _pos, "Expect ';' after value.")?;
+
+        Ok(Statement::Print(value))
     }
+
     fn return_stmt(&mut self) -> Result<Statement, ParserError> {
         Err(ParserError::Error)
     }
