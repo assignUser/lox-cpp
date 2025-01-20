@@ -1,24 +1,24 @@
-#![allow(dead_code, unused_imports)]
-
 use core::slice::Iter;
-use std::iter::Enumerate;
+use std::iter::Peekable;
 
-use crate::scanner::{self, SourcePos, Token};
-use crate::LoxError;
+use crate::scanner::{SourcePos, Token};
 
-struct Identifier {
+#[derive(Debug)]
+pub struct Identifier {
     name: String,
     pos: SourcePos,
 }
 
-enum Declaration {
+#[derive(Debug)]
+pub enum Declaration {
     Class(Class),
     Function(Function),
     Var(Var),
     Statement(Statement),
 }
 
-enum Statement {
+#[derive(Debug)]
+pub enum Statement {
     Block,
     Expression(Expression),
     For,
@@ -28,31 +28,35 @@ enum Statement {
     While,
 }
 
-struct Class {
+#[derive(Debug)]
+pub struct Class {
     name: Identifier,
     parent: Option<Identifier>,
     body: Vec<Function>,
 }
 
-struct Function {
+#[derive(Debug)]
+pub struct Function {
     name: Identifier,
     parameters: Option<Vec<Identifier>>,
     body: Vec<Statement>,
 }
 
-struct Var {
+#[derive(Debug)]
+pub struct Var {
     name: Identifier,
     expr: Expression,
 }
 
-enum Expression {
+#[derive(Debug)]
+pub enum Expression {
     Assign {
-        name: String,
-        value: Value,
+        name: Identifier,
+        value: Box<Expression>,
     },
     Binary {
         lhs: Box<Expression>,
-        operator: BinaryOperator,
+        operator: Token,
         rhs: Box<Expression>,
     },
     Call {
@@ -61,7 +65,7 @@ enum Expression {
         pos: SourcePos,
     },
     Get {
-        name: Token,
+        name: Identifier,
         object: Box<Expression>,
     },
     Grouping {
@@ -69,75 +73,117 @@ enum Expression {
     },
     Set {
         value: Box<Expression>,
-        name: Token,
+        name: Identifier,
         object: Box<Expression>,
     },
     Super {
         keyword: Token,
-        method: Token,
+        method: Identifier,
     },
     This {
         keyword: Token,
     },
     Unary {
-        operator: UnaryOperator,
+        operator: Token,
         rhs: Box<Expression>,
     },
     Variable {
-        name: Token,
+        name: Identifier,
     },
     Literal(Value),
 }
 
-enum Value {
-    Boolean(bool),
-    Nil,
-    Number(f64),
-    String(String),
+#[derive(Debug)]
+pub enum Value {
+    Boolean { value: bool, pos: SourcePos },
+    Nil(SourcePos),
+    Number { value: f64, pos: SourcePos },
+    String { value: String, pos: SourcePos },
 }
 
-enum UnaryOperator {
-    And(Token),
-    Bang(Token),
-    Or(Token),
-}
-
-enum BinaryOperator {
-    BangEqual(Token),
-    Equal(Token),
-    EqualEqual(Token),
-    Greater(Token),
-    GreaterEqual(Token),
-    Less(Token),
-    LessEqual(Token),
-    Minus(Token),
-    Plus(Token),
-    Slash(Token),
-    Star(Token),
-}
-
-enum ParserError {
+#[derive(Debug)]
+pub enum ParserError {
     Error,
     UnexpectedEof,
-    UnexepctedToken { token: Token, message: String },
+    UnexpectedToken { token: Token, message: String },
+    Syntax { token: Token, message: String },
+    UnexpectedStatement { stmt: Statement, message: String },
 }
 
-struct Parser<'a> {
-    tokens: Vec<scanner::Token>,
-    iter: Enumerate<Iter<'a, scanner::Token>>,
+#[derive(Debug)]
+pub struct Parser<'a> {
+    tokens: &'a Vec<Token>,
+    iter: Peekable<Iter<'a, Token>>,
 }
 
-impl Parser<'_> {
-    // pub fn new(tokens: Vec<scanner::Token>) -> Parser {
-    //     Parser {
-    //         curr: 0,
-    //         len: tokens.len(),
-    //         tokens,
-    //     }
-    // }
+macro_rules! binary_expression {
+    ($self:ident, $next:ident, $token_pat:pat) => {{
+        let mut lhs = $self.$next()?;
 
-    pub fn parse(tokens: Vec<scanner::Token>) -> Result<Vec<Statement>, ParserError> {
+        while let $token_pat = $self.peek() {
+            let op = $self.iter.next().expect("Token was peeked!");
+            let rhs = $self.$next()?;
+
+            lhs = match lhs {
+                Statement::Expression(_) => Statement::Expression(Expression::Binary {
+                    lhs: $self.box_expression(lhs)?,
+                    operator: op.clone(),
+                    rhs: $self.box_expression(rhs)?,
+                }),
+                _ => {
+                    return Err(ParserError::Syntax {
+                        token: op.clone(),
+                        message: "Expected Expression".to_owned(),
+                    })
+                }
+            }
+        }
+
+        Ok(lhs)
+    }};
+}
+
+macro_rules! consume {
+    (
+        $self:ident,
+        $variant:ident $pattern:tt,
+        $return_expr:expr,
+        $message:expr
+    ) => {{
+        let token = $self.iter.next();
+        match token {
+            None => Err(ParserError::UnexpectedEof),
+            #[allow(unused_variables)]
+            Some(t @ Token::$variant $pattern) => {
+                // t is the entire matched token, and
+                // any fields/patterns in $pattern are bound for $return_expr
+                Ok($return_expr)
+            }
+            Some(t) => Err(ParserError::UnexpectedToken {
+                token: t.clone(),
+                message: $message.to_string(),
+            }),
+        }
+    }};
+}
+
+impl<'a> Parser<'a> {
+    fn peek(&mut self) -> &Token {
+        self.iter.peek().unwrap_or(&&Token::Eof)
+    }
+
+    pub fn new(tokens: &'a Vec<Token>) -> Self {
+        Self {
+            tokens,
+            iter: tokens.iter().peekable(),
+        }
+    }
+
+    pub fn parse(&mut self) -> Result<Vec<Statement>, ParserError> {
         let mut statements: Vec<Statement> = vec![];
+        while *self.peek() != Token::Eof {
+            statements.push(self.declaration()?);
+        }
 
         Ok(statements)
     }
@@ -151,12 +197,39 @@ impl Parser<'_> {
     //                  "{" function* "}" ;
     // funDecl        → "fun" function ;
     // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+    //
+    // statement      → exprStmt
+    //                | forStmt
+    //                | ifStmt
+    //                | printStmt
+    //                | returnStmt
+    //                | whileStmt
+    //                | block ;
+    //
+    // exprStmt       → expression ";" ;
+    // forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
+    //                            expression? ";"
+    //                            expression? ")" statement ;
+    // ifStmt         → "if" "(" expression ")" statement
+    //                  ( "else" statement )? ;
+    // printStmt      → "print" expression ";" ;
+    // returnStmt     → "return" expression? ";" ;
+    // whileStmt      → "while" "(" expression ")" statement ;
+    // block          → "{" declaration* "}" ;
     fn declaration(&mut self) -> Result<Statement, ParserError> {
-        let (_, token) = self.iter.next().ok_or(ParserError::UnexpectedEof)?;
-        match token {
-            Token::Var(_) => self.variable(),
-            Token::Class(_) => self.class(),
-            Token::Fun(_) => self.function(),
+        match self.peek() {
+            Token::Var(_) => {
+                self.iter.next();
+                self.variable()
+            }
+            Token::Class(_) => {
+                self.iter.next();
+                self.class()
+            }
+            Token::Fun(_) => {
+                self.iter.next();
+                self.function()
+            }
             _ => self.statement(),
         }
     }
@@ -170,22 +243,50 @@ impl Parser<'_> {
         Err(ParserError::Error)
     }
     fn statement(&mut self) -> Result<Statement, ParserError> {
-        let (_, token) = self.iter.next().ok_or(ParserError::UnexpectedEof)?;
-        match token {
+        match self.peek() {
+            Token::For(_) => {
+                self.iter.next();
+                self.for_stmt()
+            }
+            Token::If(_) => {
+                self.iter.next();
+                self.if_stmt()
+            }
+            Token::Print(_) => {
+                self.iter.next();
+                self.print_stmt()
+            }
+            Token::Return(_) => {
+                self.iter.next();
+                self.return_stmt()
+            }
+            Token::While(_) => {
+                self.iter.next();
+                self.while_stmt()
+            }
+            Token::LeftBrace(_) => {
+                self.iter.next();
+                self.block()
+            }
             _ => self.expr_stmt(),
         }
     }
     fn expr_stmt(&mut self) -> Result<Statement, ParserError> {
         let expr = self.expression()?;
-        match self.iter.next() {
-            None => Err(ParserError::UnexpectedEof),
-            Some((_, t)) => match t {
-                Token::Semicolon(_) => Ok(expr),
-                _ => Err(ParserError::UnexepctedToken {
-                    token: t.clone(),
+
+        match self.iter.next().unwrap_or(&Token::Eof) {
+            Token::Semicolon(_) => Ok(expr),
+            t => {
+                let token = if let Token::Eof = t {
+                    self.tokens.last().expect("Already in expression!").clone()
+                } else {
+                    t.clone()
+                };
+                Err(ParserError::UnexpectedToken {
+                    token,
                     message: "Expect ';' after expression.".to_owned(),
-                }),
-            },
+                })
+            }
         }
     }
     fn for_stmt(&mut self) -> Result<Statement, ParserError> {
@@ -207,54 +308,275 @@ impl Parser<'_> {
         Err(ParserError::Error)
     }
 
-    // expression     → assignment ;
     //
+    //
+    //
+
+    fn box_expression(&self, stmt: Statement) -> Result<Box<Expression>, ParserError> {
+        match stmt {
+            Statement::Expression(e) => Ok(Box::new(e)),
+            _ => Err(ParserError::Error),
+        }
+    }
+
+    // expression     → assignment ;
+    fn expression(&mut self) -> Result<Statement, ParserError> {
+        self.assignment()
+    }
+
     // assignment     → ( call "." )? IDENTIFIER "=" assignment
     //                | logic_or ;
-    //
+    fn assignment(&mut self) -> Result<Statement, ParserError> {
+        let var = self.logic_or()?;
+
+        if let Token::Equal(_) = self.peek() {
+            let equals = self.iter.next().expect("Token was peeked!");
+            let value = self.assignment()?;
+
+            match var {
+                Statement::Expression(Expression::Variable { name: n }) => {
+                    return Ok(Statement::Expression(Expression::Assign {
+                        name: n,
+                        value: self.box_expression(value)?,
+                    }));
+                }
+                Statement::Expression(Expression::Get { name, object }) => {
+                    return Ok(Statement::Expression(Expression::Set {
+                        value: self.box_expression(value)?,
+                        name,
+                        object,
+                    }));
+                }
+                _ => {
+                    return Err(ParserError::Syntax {
+                        token: equals.clone(),
+                        message: "Invalid assignment target.".to_owned(),
+                    })
+                }
+            }
+        }
+
+        Ok(var)
+    }
+
     // logic_or       → logic_and ( "or" logic_and )* ;
+    fn logic_or(&mut self) -> Result<Statement, ParserError> {
+        binary_expression!(self, logic_and, Token::Or(_))
+    }
+
     // logic_and      → equality ( "and" equality )* ;
+    fn logic_and(&mut self) -> Result<Statement, ParserError> {
+        binary_expression!(self, equality, Token::And(_))
+    }
+
     // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+    fn equality(&mut self) -> Result<Statement, ParserError> {
+        binary_expression!(self, comparison, Token::BangEqual(_) | Token::EqualEqual(_))
+    }
+
     // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+    fn comparison(&mut self) -> Result<Statement, ParserError> {
+        binary_expression!(
+            self,
+            term,
+            Token::Greater(_) | Token::GreaterEqual(_) | Token::Less(_) | Token::LessEqual(_)
+        )
+    }
+
     // term           → factor ( ( "-" | "+" ) factor )* ;
+    fn term(&mut self) -> Result<Statement, ParserError> {
+        binary_expression!(self, factor, Token::Minus(_) | Token::Plus(_))
+    }
+
     // factor         → unary ( ( "/" | "*" ) unary )* ;
-    //
+    fn factor(&mut self) -> Result<Statement, ParserError> {
+        binary_expression!(self, unary, Token::Star(_) | Token::Slash(_))
+    }
+
     // unary          → ( "!" | "-" ) unary | call ;
+    fn unary(&mut self) -> Result<Statement, ParserError> {
+        if let Token::Bang(_) | Token::Minus(_) = self.peek() {
+            let op = self.iter.next().expect("Token peeked!");
+            let rhs = self.unary()?;
+
+            return Ok(Statement::Expression(Expression::Unary {
+                operator: op.clone(),
+                rhs: self.box_expression(rhs)?,
+            }));
+        }
+
+        self.call()
+    }
+
     // call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
+
+    fn call(&mut self) -> Result<Statement, ParserError> {
+        let mut expr = self.primary()?;
+
+        loop {
+            expr = match self.peek() {
+                Token::LeftParen(_) => self.finish_call(expr)?,
+                // chained calls/property access class.field.nested
+                Token::Dot(_) => {
+                    // Consume Dot
+                    self.iter.next();
+                    let token = self.iter.next().ok_or(ParserError::UnexpectedEof)?;
+
+                    match token {
+                        Token::Identifier { ident, pos } => {
+                            Statement::Expression(Expression::Get {
+                                name: Identifier {
+                                    name: ident.to_string(),
+                                    pos: pos.clone(),
+                                },
+                                object: self.box_expression(expr)?,
+                            })
+                        }
+                        _ => {
+                            return Err(ParserError::UnexpectedToken {
+                                token: token.clone(),
+                                message: "Expect property name after '.'.".to_owned(),
+                            })
+                        }
+                    }
+                }
+                _ => break,
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Statement) -> Result<Statement, ParserError> {
+        let callee_name = match callee {
+            Statement::Expression(Expression::Literal(Value::String { value, pos })) => {
+                Identifier {
+                    name: value.clone(),
+                    pos,
+                }
+            }
+            _ => {
+                return Err(ParserError::UnexpectedStatement {
+                    stmt: callee,
+                    message: "Identifier expected as callee name!".to_string(),
+                })
+            }
+        };
+
+        let mut args: Vec<Identifier> = vec![];
+
+        macro_rules! push_arg {
+            () => {{
+                let arg = self.expression()?;
+                match arg {
+                    Statement::Expression(Expression::Literal(Value::String { value, pos })) => {
+                        args.push(Identifier {
+                            name: value.clone(),
+                            pos,
+                        })
+                    }
+                    _ => {
+                        return Err(ParserError::UnexpectedStatement {
+                            stmt: arg,
+                            message: "Identifier expected as call argument!".to_string(),
+                        })
+                    }
+                }
+            }};
+        }
+
+        if let Token::RightParen(_) = self.peek() {
+            // empty call ()
+        } else {
+            push_arg!();
+
+            while let Token::Comma(_) = self.peek() {
+                // Consume ,
+                self.iter.next();
+                push_arg!();
+            }
+        }
+
+        let pos = consume!(self, RightParen(pos), pos, "Expect ')' after arguments.")?;
+
+        Ok(Statement::Expression(Expression::Call {
+            callee: callee_name,
+            arguments: Some(args),
+            pos: pos.clone(),
+        }))
+    }
+
     // primary        → "true" | "false" | "nil" | "this"
     //                | NUMBER | STRING | IDENTIFIER | "(" expression ")"
     //                | "super" "." IDENTIFIER ;
-    fn expression(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
-    }
-    fn assignment(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
-    }
-    fn logic_or(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
-    }
-    fn logic_and(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
-    }
-    fn equality(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
-    }
-    fn comparison(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
-    }
-    fn term(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
-    }
-    fn factor(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
-    }
-    fn unary(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
-    }
-    fn call(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
-    }
     fn primary(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
+        let token = self.iter.next().ok_or(ParserError::UnexpectedEof)?;
+
+        let stmt = match token {
+            Token::True(p) => Statement::Expression(Expression::Literal(Value::Boolean {
+                value: true,
+                pos: p.clone(),
+            })),
+            Token::False(p) => Statement::Expression(Expression::Literal(Value::Boolean {
+                value: false,
+                pos: p.clone(),
+            })),
+            Token::Nil(p) => Statement::Expression(Expression::Literal(Value::Nil(p.clone()))),
+            Token::This(_) => Statement::Expression(Expression::This {
+                keyword: token.clone(),
+            }),
+            Token::Number { value, pos } => {
+                Statement::Expression(Expression::Literal(Value::Number {
+                    value: *value,
+                    pos: pos.clone(),
+                }))
+            }
+            Token::String { string, pos } => {
+                Statement::Expression(Expression::Literal(Value::String {
+                    value: string.clone(),
+                    pos: pos.clone(),
+                }))
+            }
+            Token::Identifier { ident, pos } => Statement::Expression(Expression::Variable {
+                name: Identifier {
+                    name: ident.clone(),
+                    pos: pos.clone(),
+                },
+            }),
+            Token::Super(_) => {
+                consume!(self, Dot(_pos), _pos, "Expect '.' after 'super'.")?;
+                let method = consume!(
+                    self,
+                    Identifier { ident, pos },
+                    (ident, pos),
+                    "Expect superclass method name."
+                )?;
+                Statement::Expression(Expression::Super {
+                    keyword: token.clone(),
+                    method: Identifier {
+                        name: method.0.to_owned(),
+                        pos: method.1.clone(),
+                    },
+                })
+            }
+            Token::LeftParen(_) => {
+                let expr = self.expression()?;
+                consume!(self, RightParen(_pos), _pos, "Expect ')' after expression.")?;
+                // ExprPtr expr = expression();
+                // // consume should use unexpected?
+                // consume(Token::Type::RIGHT_PAREN, "Expect ')' after expression.");
+                // return Grouping::make(std::move(expr));
+                Statement::Expression(Expression::Grouping {
+                    expr: self.box_expression(expr)?,
+                })
+            }
+            _ => {
+                return Err(ParserError::UnexpectedToken {
+                    token: token.clone(),
+                    message: "Expect expressions.".to_owned(),
+                })
+            }
+        };
+        Ok(stmt)
     }
 }

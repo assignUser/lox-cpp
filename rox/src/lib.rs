@@ -1,15 +1,20 @@
-mod scanner;
 mod parser;
+mod scanner;
+use parser::ParserError;
 use scanner::ScannerError;
 
 #[derive(Debug)]
 pub enum LoxError {
+    Exit,
+    Parser(ParserError),
     Scanner(ScannerError),
     Io(std::io::Error),
 }
 
 pub mod cli {
+    use crate::scanner::Token;
     use crate::LoxError;
+    use crate::{parser::Parser, scanner::ScannerError};
 
     use super::scanner;
     use std::io::{self, stdout, Write};
@@ -37,9 +42,9 @@ pub mod cli {
             stdout().flush().expect("stdout should be writeable!");
         };
 
+        print_prompt();
         for line in io::stdin().lines() {
-            print_prompt();
-            run(&line.expect("stdin should be readable!"))?;
+            let _ = run(&line.expect("stdin should be readable!"));
             print_prompt();
         }
 
@@ -53,12 +58,22 @@ pub mod cli {
     }
 
     fn run(source: &str) -> Result<(), LoxError> {
-        let tokens = scanner::scan(source);
-        for token in tokens.map_err(LoxError::Scanner)? {
-            println!("{}", token.map_err(LoxError::Scanner)?);
+        let tokens = scanner::scan(source).map_err(LoxError::Scanner)?;
+
+        let errors: Vec<ScannerError> = tokens
+            .iter()
+            .filter_map(|e| Result::err(e.clone()))
+            .collect();
+        let tokens: Vec<Token> = tokens.into_iter().filter_map(Result::ok).collect();
+
+        if !errors.is_empty() {
+            errors.iter().for_each(|e| eprintln!("{}", &e));
+            return Err(LoxError::Exit);
         }
 
-        println!("{}", scanner::Token::Eof);
+        let mut parser = Parser::new(&tokens);
+        let res = parser.parse().map_err(LoxError::Parser)?;
+
         Ok(())
     }
 }

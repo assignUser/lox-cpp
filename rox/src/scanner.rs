@@ -1,4 +1,6 @@
+use std::fmt;
 use std::fmt::Display;
+
 type ScannerResult = Result<Token, ScannerError>;
 
 pub fn scan(source: &str) -> Result<ScannerResults, ScannerError> {
@@ -10,6 +12,12 @@ pub fn scan(source: &str) -> Result<ScannerResults, ScannerError> {
 pub struct SourcePos {
     row: usize,
     col: usize,
+}
+
+impl fmt::Display for SourcePos {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "line {}, column {}", self.row, self.col)
+    }
 }
 
 #[derive(Debug)]
@@ -185,7 +193,7 @@ impl Scanner<'_> {
             self.peek(0).expect("length checked!") as char,
             self.peek(1).unwrap_or(b' ') as char
         );
-        dbg!(&op);
+
         token_from_str!(
             &op,
             self.source.current_pos(0),
@@ -415,13 +423,32 @@ impl Iterator for Scanner<'_> {
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum ScannerError {
     #[default]
     NonAsciiCharacer,
     NumberParsingError,
     UnexpectedCharacter(SourcePos),
     UnterminatedString(SourcePos),
+}
+
+impl Display for ScannerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ScannerError::NonAsciiCharacer => {
+                write!(f, "Non-ASCII character encountered")
+            }
+            ScannerError::NumberParsingError => {
+                write!(f, "Number parsing error")
+            }
+            ScannerError::UnexpectedCharacter(pos) => {
+                write!(f, "Unexpected character at {}", pos)
+            }
+            ScannerError::UnterminatedString(pos) => {
+                write!(f, "Unterminated string at {}", pos)
+            }
+        }
+    }
 }
 
 type ScannerResults = Vec<Result<Token, ScannerError>>;
