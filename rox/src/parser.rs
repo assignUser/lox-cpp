@@ -188,6 +188,27 @@ impl<'a> Parser<'a> {
         Ok(statements)
     }
 
+    /// Discard all Tokens until a known good starting point is reached
+    fn synchronize(&mut self) {
+        while let Some(token) = self.iter.next() {
+            if let Token::Semicolon(_) = token {
+                return;
+            }
+
+            match self.peek() {
+                Token::Class(_)
+                | Token::Fun(_)
+                | Token::Var(_)
+                | Token::For(_)
+                | Token::If(_)
+                | Token::While(_)
+                | Token::Print(_)
+                | Token::Return(_) => return,
+                Token::Eof => return,
+                _ => (),
+            }
+        }
+    }
     // declaration    → classDecl
     //                | funDecl
     //                | varDecl
@@ -217,7 +238,7 @@ impl<'a> Parser<'a> {
     // whileStmt      → "while" "(" expression ")" statement ;
     // block          → "{" declaration* "}" ;
     fn declaration(&mut self) -> Result<Statement, ParserError> {
-        match self.peek() {
+        let decl = match self.peek() {
             Token::Var(_) => {
                 self.iter.next();
                 self.variable()
@@ -231,7 +252,13 @@ impl<'a> Parser<'a> {
                 self.function()
             }
             _ => self.statement(),
+        };
+
+        if decl.is_err() {
+            self.synchronize();
         }
+
+        decl
     }
     fn class(&mut self) -> Result<Statement, ParserError> {
         Err(ParserError::Error)
@@ -307,10 +334,6 @@ impl<'a> Parser<'a> {
     fn block(&mut self) -> Result<Statement, ParserError> {
         Err(ParserError::Error)
     }
-
-    //
-    //
-    //
 
     fn box_expression(&self, stmt: Statement) -> Result<Box<Expression>, ParserError> {
         match stmt {
