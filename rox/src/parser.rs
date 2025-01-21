@@ -54,7 +54,7 @@ pub struct Block {
 pub struct Class {
     name: Identifier,
     parent: Option<Identifier>,
-    body: Vec<Function>,
+    methods: Vec<Function>,
 }
 
 #[derive(Debug)]
@@ -279,6 +279,14 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn identifier_from_token(&mut self, error_message: &str) -> Result<Identifier, ParserError> {
+        let name = consume!(self, Identifier { ident, pos }, (ident, pos), error_message)?;
+        Ok(Identifier {
+            name: name.0.clone(),
+            pos: name.1.clone(),
+        })
+    }
+
     // declaration    → classDecl
     //                | funDecl
     //                | varDecl
@@ -330,21 +338,40 @@ impl<'a> Parser<'a> {
         dbg!(&decl);
         decl
     }
+
     fn class(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
+        let name = self.identifier_from_token("Expect class name.")?;
+
+        // Optional super class
+        let mut parent = None;
+        if let Token::Less(_) = self.peek() {
+            // consume <
+            self.iter.next();
+
+            parent = Some(self.identifier_from_token("Expect super class name.")?);
+        }
+
+        consume!(self, LeftBrace(_), (), "Expect '{{' before class body.")?;
+        let mut methods: Vec<Function> = vec![];
+
+        loop {
+            match self.peek() {
+                Token::RightBrace(_) => break,
+                _ => methods.push(take_variant!(self.function("method")?, Function)?),
+            }
+        }
+
+        consume!(self, RightBrace(_), (), "Expect '}}' after class body.")?;
+
+        Ok(Statement::Class(Class {
+            name,
+            parent,
+            methods,
+        }))
     }
 
     fn function(&mut self, kind: &str) -> Result<Statement, ParserError> {
-        let name = consume!(
-            self,
-            Identifier { ident, pos },
-            (ident.clone(), pos.clone()),
-            format!("Expect {kind} name.")
-        )?;
-        let name = Identifier {
-            name: name.0,
-            pos: name.1,
-        };
+        let name = self.identifier_from_token(&format!("Expect {kind} name."))?;
 
         consume!(
             self,
@@ -414,12 +441,8 @@ impl<'a> Parser<'a> {
     }
 
     fn variable(&mut self) -> Result<Statement, ParserError> {
-        let name = consume!(
-            self,
-            Identifier { ident, pos },
-            (ident.clone(), pos.clone()),
-            "Expect Variable name."
-        )?;
+        let name = self.identifier_from_token("Expect Variable name.")?;
+
         let mut initializer: Option<Expression> = None;
 
         if let Token::Equal(_) = self.peek() {
@@ -442,13 +465,7 @@ impl<'a> Parser<'a> {
             "Expect ';' after variable declaration."
         )?;
 
-        Ok(Statement::Var(Var {
-            name: Identifier {
-                name: name.0,
-                pos: name.1,
-            },
-            initializer,
-        }))
+        Ok(Statement::Var(Var { name, initializer }))
     }
 
     fn statement(&mut self) -> Result<Statement, ParserError> {
@@ -478,6 +495,7 @@ impl<'a> Parser<'a> {
             _ => self.expr_stmt(),
         }
     }
+
     fn expr_stmt(&mut self) -> Result<Statement, ParserError> {
         let expr = self.expression()?;
         match self.iter.next().unwrap_or(&Token::Eof) {
@@ -567,15 +585,7 @@ impl<'a> Parser<'a> {
     }
 
     fn print_stmt(&mut self) -> Result<Statement, ParserError> {
-        let value = match self.expression()? {
-            Statement::Expression(expr) => expr,
-            stmt => {
-                return Err(ParserError::UnexpectedStatement {
-                    stmt,
-                    message: "Expect expression after 'print'".to_string(),
-                });
-            }
-        };
+        let value = take_variant!(self.expression()?, Expression)?;
 
         consume!(self, Semicolon(_pos), _pos, "Expect ';' after value.")?;
 
@@ -776,30 +786,15 @@ impl<'a> Parser<'a> {
 
         let mut args: Vec<Expression> = vec![];
 
-        macro_rules! push_arg {
-            () => {{
-                let arg = self.expression()?;
-                match arg {
-                    Statement::Expression(expr) => args.push(expr),
-                    _ => {
-                        return Err(ParserError::UnexpectedStatement {
-                            stmt: arg,
-                            message: "Expression expected as call argument!".to_string(),
-                        })
-                    }
-                }
-            }};
-        }
-
         if let Token::RightParen(_) = self.peek() {
             // empty call ()
         } else {
-            push_arg!();
+            args.push(take_variant!(self.expression()?, Expression)?);
 
             while let Token::Comma(_) = self.peek() {
                 // Consume ,
                 self.iter.next();
-                push_arg!();
+                args.push(take_variant!(self.expression()?, Expression)?);
             }
         }
 
