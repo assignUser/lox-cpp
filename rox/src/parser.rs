@@ -10,11 +10,26 @@ pub struct Identifier {
 }
 
 #[derive(Debug)]
+pub enum Initializer {
+    Expression(Expression),
+    Var(Var),
+}
+
+#[derive(Debug)]
 pub enum Statement {
     Block(Block),
     Expression(Expression),
-    For,
-    If,
+    For {
+        initializer: Option<Initializer>,
+        condition: Option<Expression>,
+        increment: Option<Expression>,
+        body: Box<Statement>,
+    },
+    If {
+        condition: Expression,
+        then_branch: Box<Statement>,
+        else_branch: Option<Box<Statement>>,
+    },
     Print(Expression),
     Return {
         keyword: Token,
@@ -22,7 +37,7 @@ pub enum Statement {
     },
     While {
         condition: Expression,
-        body: Block,
+        body: Box<Statement>,
     },
     Class(Class),
     Function(Function),
@@ -205,6 +220,22 @@ macro_rules! consume {
     }};
 }
 
+macro_rules! take_variant {
+    (
+        $stmt:expr,
+        // The variant name within `Statement`
+        $Variant:ident
+    ) => {{
+        match $stmt {
+            Statement::$Variant(val) => Ok(val),
+            stmt => Err(ParserError::UnexpectedStatement {
+                stmt,
+                message: format!("Expect {}.", stringify!($Variant)),
+            }),
+        }
+    }};
+}
+
 impl<'a> Parser<'a> {
     fn peek(&mut self) -> &Token {
         self.iter.peek().unwrap_or(&&Token::Eof)
@@ -248,15 +279,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn take_expr(&self, stmt: Statement) -> Result<Expression, ParserError> {
-        match stmt {
-            Statement::Expression(expr) => Ok(expr),
-            _ => Err(ParserError::UnexpectedStatement {
-                stmt,
-                message: "Expected Expression".to_owned(),
-            }),
-        }
-    }
     // declaration    → classDecl
     //                | funDecl
     //                | varDecl
@@ -473,11 +495,75 @@ impl<'a> Parser<'a> {
             }
         }
     }
+
     fn for_stmt(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
+        consume!(self, LeftParen(_pos), _pos, "Expect '(' after 'for'.")?;
+
+        let initializer = match self.peek() {
+            Token::Semicolon(_) => None,
+            Token::Var(_) => {
+                self.iter.next();
+                Some(Initializer::Var(take_variant!(self.variable()?, Var)?))
+            }
+            _ => Some(Initializer::Expression(take_variant!(
+                self.expr_stmt()?,
+                Expression
+            )?)),
+        };
+
+        let mut condition = None;
+        if let Token::Semicolon(_) = self.peek() {
+            // no condition
+        } else {
+            condition = Some(take_variant!(self.expression()?, Expression)?);
+        }
+
+        consume!(
+            self,
+            Semicolon(_pos),
+            _pos,
+            "Expect ';' after loop condition."
+        )?;
+
+        let mut increment = None;
+        if let Token::RightParen(_) = self.peek() {
+            // no increment
+        }
+        {
+            increment = Some(take_variant!(self.expression()?, Expression)?);
+        }
+
+        consume!(self, RightParen(_pos), (), "Expect ')' after for clauses.")?;
+
+        let body = Box::new(self.statement()?);
+
+        Ok(Statement::For {
+            initializer,
+            condition,
+            increment,
+            body,
+        })
     }
+
     fn if_stmt(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
+        consume!(self, LeftParen(_pos), _pos, "Expect '(' after 'if'.")?;
+
+        let condition = take_variant!(self.expression()?, Expression)?;
+
+        consume!(self, RightParen(_pos), _pos, "Expect ')' after 'if'.")?;
+
+        let then_branch = Box::new(self.statement()?);
+        let mut else_branch = None;
+
+        if let Token::Else(_) = self.peek() {
+            else_branch = Some(Box::new(self.statement()?));
+        }
+
+        Ok(Statement::If {
+            condition,
+            then_branch,
+            else_branch,
+        })
     }
 
     fn print_stmt(&mut self) -> Result<Statement, ParserError> {
@@ -504,8 +590,7 @@ impl<'a> Parser<'a> {
         if let Token::Semicolon(_) = self.peek() {
             // no return value
         } else {
-            let stmt = self.expression()?;
-            value = Some(self.take_expr(stmt)?);
+            value = Some(take_variant!(self.expression()?, Expression)?);
         }
 
         Ok(Statement::Return { keyword, value })
@@ -513,33 +598,12 @@ impl<'a> Parser<'a> {
 
     fn while_stmt(&mut self) -> Result<Statement, ParserError> {
         consume!(self, LeftParen(_), (), "Expect '(' after 'while'.")?;
-        let mut stmt = self.expression()?;
-        let condition = self.take_expr(stmt)?;
+
+        let condition = take_variant!(self.expression()?, Expression)?;
 
         consume!(self, RightParen(_), (), "Expect ')' after condition.")?;
 
-        let body = match self.iter.next() {
-            Some(Token::LeftBrace(pos)) => {
-                let key = pos.clone();
-                self.iter.next();
-                match self.block_stmt(key)? {
-                    Statement::Block(block) => block,
-                    stmt => {
-                        return Err(ParserError::UnexpectedStatement {
-                            stmt,
-                            message: "Expect block after 'while' condition.".to_string(),
-                        })
-                    }
-                }
-            }
-            Some(t) => {
-                return Err(ParserError::UnexpectedToken {
-                    token: t.clone(),
-                    message: "Expect '{{' after condition.".to_string(),
-                })
-            }
-            None => return Err(ParserError::UnexpectedEof),
-        };
+        let body = Box::new(self.statement()?);
 
         Ok(Statement::While { condition, body })
     }
