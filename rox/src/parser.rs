@@ -281,7 +281,7 @@ impl<'a> Parser<'a> {
             }
             Token::Fun(_) => {
                 self.iter.next();
-                self.function()
+                self.function("function")
             }
             _ => self.statement(),
         };
@@ -295,27 +295,83 @@ impl<'a> Parser<'a> {
     fn class(&mut self) -> Result<Statement, ParserError> {
         Err(ParserError::Error)
     }
-    fn function(&mut self) -> Result<Statement, ParserError> {
-        macro_rules! push_arg {
+    fn function(&mut self, kind: &str) -> Result<Statement, ParserError> {
+        let name = consume!(
+            self,
+            Identifier { ident, pos },
+            (ident.clone(), pos.clone()),
+            format!("Expect {kind} name.")
+        )?;
+        let name = Identifier {
+            name: name.0,
+            pos: name.1,
+        };
+
+        consume!(
+            self,
+            LeftParen(_),
+            (),
+            format!("Expect '(' after {kind} name.")
+        )?;
+
+        let mut params: Vec<Identifier> = vec![];
+        macro_rules! push_param {
             () => {{
-                let arg = self.expression()?;
-                match arg {
-                    Statement::Expression(Expression::Literal(Value::String { value, pos })) => {
-                        args.push(Identifier {
-                            name: value.clone(),
-                            pos,
-                        })
-                    }
-                    _ => {
-                        return Err(ParserError::UnexpectedStatement {
-                            stmt: arg,
-                            message: "Identifier expected as call argument!".to_string(),
-                        })
-                    }
-                }
+                let name_token = consume!(
+                    self,
+                    Identifier { ident, pos },
+                    (ident.clone(), pos.clone()),
+                    "Expect parameter name."
+                )?;
+
+                params.push(Identifier {
+                    name: name_token.0,
+                    pos: name_token.1,
+                });
+                Ok(())
             }};
         }
-        Err(ParserError::Error)
+
+        if let Token::RightParen(_) = self.peek() {
+            // no params
+        } else {
+            push_param!()?;
+
+            while let Token::Comma(_) = self.peek() {
+                // Consume ,
+                self.iter.next();
+                push_param!()?;
+            }
+        }
+
+        consume!(
+            self,
+            RightParen(pos),
+            pos.clone(),
+            "Expect ')' after arguments."
+        )?;
+
+        let key_pos = consume!(
+            self,
+            LeftBrace(pos),
+            pos.clone(),
+            format!("Expect '{{' before {kind} body.")
+        )?;
+
+        let body = self.block_stmt(key_pos)?;
+
+        Ok(Statement::Function(Function {
+            name,
+            parameters: Some(params),
+            body: if let Statement::Block(block) = body {
+                block
+            } else {
+                return Err(ParserError::UnexpectedStatement {
+                    stmt: body,
+                    message: format!("Expect '{{' before {kind} body."),
+                });
+            },
+        }))
     }
 
     fn variable(&mut self) -> Result<Statement, ParserError> {
