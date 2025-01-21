@@ -16,7 +16,10 @@ pub enum Statement {
     For,
     If,
     Print(Expression),
-    Return,
+    Return {
+        keyword: Token,
+        value: Option<Expression>,
+    },
     While,
     Class(Class),
     Function(Function),
@@ -241,6 +244,16 @@ impl<'a> Parser<'a> {
             }
         }
     }
+
+    fn take_expr(&self, stmt: Statement) -> Result<Expression, ParserError> {
+        match stmt {
+            Statement::Expression(expr) => Ok(expr),
+            _ => Err(ParserError::UnexpectedStatement {
+                stmt,
+                message: "Expected Expression".to_owned(),
+            }),
+        }
+    }
     // declaration    → classDecl
     //                | funDecl
     //                | varDecl
@@ -295,6 +308,7 @@ impl<'a> Parser<'a> {
     fn class(&mut self) -> Result<Statement, ParserError> {
         Err(ParserError::Error)
     }
+
     fn function(&mut self, kind: &str) -> Result<Statement, ParserError> {
         let name = consume!(
             self,
@@ -426,10 +440,7 @@ impl<'a> Parser<'a> {
                 self.iter.next();
                 self.print_stmt()
             }
-            Token::Return(_) => {
-                self.iter.next();
-                self.return_stmt()
-            }
+            Token::Return(_) => self.return_stmt(),
             Token::While(_) => {
                 self.iter.next();
                 self.while_stmt()
@@ -483,8 +494,20 @@ impl<'a> Parser<'a> {
     }
 
     fn return_stmt(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
+        let keyword = self.iter.next().expect("Token peeked!").clone();
+
+        let mut value: Option<Expression> = None;
+
+        if let Token::Semicolon(_) = self.peek() {
+            // no return value
+        } else {
+            let stmt = self.expression()?;
+            value = Some(self.take_expr(stmt)?);
+        }
+
+        Ok(Statement::Return { keyword, value })
     }
+
     fn while_stmt(&mut self) -> Result<Statement, ParserError> {
         Err(ParserError::Error)
     }
