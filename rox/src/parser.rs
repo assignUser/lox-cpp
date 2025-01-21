@@ -20,7 +20,10 @@ pub enum Statement {
         keyword: Token,
         value: Option<Expression>,
     },
-    While,
+    While {
+        condition: Expression,
+        body: Block,
+    },
     Class(Class),
     Function(Function),
     Var(Var),
@@ -509,7 +512,36 @@ impl<'a> Parser<'a> {
     }
 
     fn while_stmt(&mut self) -> Result<Statement, ParserError> {
-        Err(ParserError::Error)
+        consume!(self, LeftParen(_), (), "Expect '(' after 'while'.")?;
+        let mut stmt = self.expression()?;
+        let condition = self.take_expr(stmt)?;
+
+        consume!(self, RightParen(_), (), "Expect ')' after condition.")?;
+
+        let body = match self.iter.next() {
+            Some(Token::LeftBrace(pos)) => {
+                let key = pos.clone();
+                self.iter.next();
+                match self.block_stmt(key)? {
+                    Statement::Block(block) => block,
+                    stmt => {
+                        return Err(ParserError::UnexpectedStatement {
+                            stmt,
+                            message: "Expect block after 'while' condition.".to_string(),
+                        })
+                    }
+                }
+            }
+            Some(t) => {
+                return Err(ParserError::UnexpectedToken {
+                    token: t.clone(),
+                    message: "Expect '{{' after condition.".to_string(),
+                })
+            }
+            None => return Err(ParserError::UnexpectedEof),
+        };
+
+        Ok(Statement::While { condition, body })
     }
 
     fn block_stmt(&mut self, key: SourcePos) -> Result<Statement, ParserError> {
