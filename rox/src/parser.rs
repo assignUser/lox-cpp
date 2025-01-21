@@ -62,7 +62,7 @@ pub enum Expression {
     },
     Call {
         callee: Identifier,
-        arguments: Option<Vec<Identifier>>,
+        arguments: Option<Vec<Expression>>,
         pos: SourcePos,
     },
     Get {
@@ -296,6 +296,25 @@ impl<'a> Parser<'a> {
         Err(ParserError::Error)
     }
     fn function(&mut self) -> Result<Statement, ParserError> {
+        macro_rules! push_arg {
+            () => {{
+                let arg = self.expression()?;
+                match arg {
+                    Statement::Expression(Expression::Literal(Value::String { value, pos })) => {
+                        args.push(Identifier {
+                            name: value.clone(),
+                            pos,
+                        })
+                    }
+                    _ => {
+                        return Err(ParserError::UnexpectedStatement {
+                            stmt: arg,
+                            message: "Identifier expected as call argument!".to_string(),
+                        })
+                    }
+                }
+            }};
+        }
         Err(ParserError::Error)
     }
 
@@ -580,22 +599,17 @@ impl<'a> Parser<'a> {
             }
         };
 
-        let mut args: Vec<Identifier> = vec![];
+        let mut args: Vec<Expression> = vec![];
 
         macro_rules! push_arg {
             () => {{
                 let arg = self.expression()?;
                 match arg {
-                    Statement::Expression(Expression::Literal(Value::String { value, pos })) => {
-                        args.push(Identifier {
-                            name: value.clone(),
-                            pos,
-                        })
-                    }
+                    Statement::Expression(expr) => args.push(expr),
                     _ => {
                         return Err(ParserError::UnexpectedStatement {
                             stmt: arg,
-                            message: "Identifier expected as call argument!".to_string(),
+                            message: "Expression expected as call argument!".to_string(),
                         })
                     }
                 }
