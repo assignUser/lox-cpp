@@ -115,7 +115,7 @@ macro_rules! token_from_str {
             $(
                 // Construct a temp instance of the variant using `Default`
                 // and compare its Display output to the input string.
-                if *s == *format!("{}", Token::$Variant(<SourcePos>::default())).split(' ').nth(1).unwrap_or(" ") {
+                if *s == *format!("{}", Token::$Variant(<SourcePos>::default())) {
                     found = Some(<Token>::$Variant($pos.clone()));
                 }
             )+
@@ -503,52 +503,45 @@ pub enum Token {
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::LeftParen(_pos) => write!(f, "LEFT_PAREN ( null"),
-            Token::RightParen(_pos) => write!(f, "RIGHT_PAREN ) null"),
-            Token::LeftBrace(_pos) => write!(f, "LEFT_BRACE {{ null"),
-            Token::RightBrace(_pos) => write!(f, "RIGHT_BRACE }} null"),
-            Token::Comma(_pos) => write!(f, "COMMA , null"),
-            Token::Dot(_pos) => write!(f, "DOT . null"),
-            Token::Minus(_pos) => write!(f, "MINUS - null"),
-            Token::Plus(_pos) => write!(f, "PLUS + null"),
-            Token::Semicolon(_pos) => write!(f, "SEMICOLON ; null"),
-            Token::Slash(_pos) => write!(f, "SLASH / null"),
-            Token::Star(_pos) => write!(f, "STAR * null"),
-            Token::Bang(_pos) => write!(f, "BANG ! null"),
-            Token::BangEqual(_pos) => write!(f, "BANG_EQUAL != null"),
-            Token::Equal(_pos) => write!(f, "EQUAL = null"),
-            Token::EqualEqual(_pos) => write!(f, "EQUAL_EQUAL == null"),
-            Token::Greater(_pos) => write!(f, "GREATER > null"),
-            Token::GreaterEqual(_pos) => write!(f, "GREATER_EQUAL >= null"),
-            Token::Less(_pos) => write!(f, "LESS < null"),
-            Token::LessEqual(_pos) => write!(f, "LESS_EQUAL <= null"),
-            Token::And(_pos) => write!(f, "AND and null"),
-            Token::Class(_pos) => write!(f, "CLASS class null"),
-            Token::Else(_pos) => write!(f, "ELSE else null"),
-            Token::False(_pos) => write!(f, "FALSE false null"),
-            Token::Fun(_pos) => write!(f, "FUN fun null"),
-            Token::For(_pos) => write!(f, "FOR for null"),
-            Token::If(_pos) => write!(f, "IF if null"),
-            Token::Nil(_pos) => write!(f, "NIL nil null"),
-            Token::Or(_pos) => write!(f, "OR or null"),
-            Token::Print(_pos) => write!(f, "PRINT print null"),
-            Token::Return(_pos) => write!(f, "RETURN return null"),
-            Token::Super(_pos) => write!(f, "SUPER super null"),
-            Token::This(_pos) => write!(f, "THIS this null"),
-            Token::True(_pos) => write!(f, "TRUE true null"),
-            Token::Var(_pos) => write!(f, "VAR var null"),
-            Token::While(_pos) => write!(f, "WHILE while null"),
-            Token::Identifier { ident, pos: _ } => write!(f, "IDENTIFIER {ident} null"),
-            Token::String { string, pos: _ } => write!(f, "STRING \"{string}\" {string}"),
-            Token::Number { value, pos: _ } => {
-                // This is to match jlox's expectation
-                if value.fract() == 0.0 {
-                    write!(f, "NUMBER {} {}.0", value, *value as i64)
-                } else {
-                    write!(f, "NUMBER {value} {value}")
-                }
-            }
-            Token::Eof => write!(f, "EOF  null"),
+            Token::LeftParen(_pos) => write!(f, "("),
+            Token::RightParen(_pos) => write!(f, ")"),
+            Token::LeftBrace(_pos) => write!(f, "{{"),
+            Token::RightBrace(_pos) => write!(f, "}}"),
+            Token::Comma(_pos) => write!(f, ","),
+            Token::Dot(_pos) => write!(f, "."),
+            Token::Minus(_pos) => write!(f, "-"),
+            Token::Plus(_pos) => write!(f, "+"),
+            Token::Semicolon(_pos) => write!(f, ";"),
+            Token::Slash(_pos) => write!(f, "/"),
+            Token::Star(_pos) => write!(f, "*"),
+            Token::Bang(_pos) => write!(f, "!"),
+            Token::BangEqual(_pos) => write!(f, "!="),
+            Token::Equal(_pos) => write!(f, "="),
+            Token::EqualEqual(_pos) => write!(f, "=="),
+            Token::Greater(_pos) => write!(f, ">"),
+            Token::GreaterEqual(_pos) => write!(f, ">="),
+            Token::Less(_pos) => write!(f, "<"),
+            Token::LessEqual(_pos) => write!(f, "<="),
+            Token::And(_pos) => write!(f, "and"),
+            Token::Class(_pos) => write!(f, "class"),
+            Token::Else(_pos) => write!(f, "else"),
+            Token::False(_pos) => write!(f, "false"),
+            Token::Fun(_pos) => write!(f, "fun"),
+            Token::For(_pos) => write!(f, "for"),
+            Token::If(_pos) => write!(f, "if"),
+            Token::Nil(_pos) => write!(f, "nil"),
+            Token::Or(_pos) => write!(f, "or"),
+            Token::Print(_pos) => write!(f, "print"),
+            Token::Return(_pos) => write!(f, "return"),
+            Token::Super(_pos) => write!(f, "super"),
+            Token::This(_pos) => write!(f, "this"),
+            Token::True(_pos) => write!(f, "true"),
+            Token::Var(_pos) => write!(f, "var"),
+            Token::While(_pos) => write!(f, "while"),
+            Token::Identifier { ident, pos: _ } => write!(f, "{ident}"),
+            Token::String { string, pos: _ } => write!(f, "{string}"),
+            Token::Number { value, pos: _ } => write!(f, "{value}"),
+            Token::Eof => write!(f, "EOF"),
         }
     }
 }

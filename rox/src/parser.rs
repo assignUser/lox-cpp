@@ -3,19 +3,19 @@ use std::{fmt::Display, iter::Peekable};
 
 use crate::scanner::{SourcePos, Token};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Identifier {
     name: String,
     pos: SourcePos,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Initializer {
     Expression(Expression),
     Var(Var),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Block(Block),
     Expression(Expression),
@@ -44,33 +44,39 @@ pub enum Statement {
     Var(Var),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     body: Vec<Statement>,
     key: SourcePos,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Class {
     name: Identifier,
     parent: Option<Identifier>,
     methods: Vec<Function>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     name: Identifier,
     parameters: Option<Vec<Identifier>>,
     body: Block,
 }
 
-#[derive(Debug)]
+impl Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "fn {}", self.name.name)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Var {
     name: Identifier,
     initializer: Option<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Assign {
         name: Identifier,
@@ -115,7 +121,7 @@ pub enum Expression {
     Literal(Value),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Boolean { value: bool, pos: SourcePos },
     Nil(SourcePos),
@@ -220,6 +226,7 @@ macro_rules! consume {
     }};
 }
 
+#[macro_export]
 macro_rules! take_variant {
     (
         $stmt:expr,
