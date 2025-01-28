@@ -1,6 +1,7 @@
 mod interpreter;
 mod parser;
 mod scanner;
+use interpreter::InterpreterError;
 use parser::ParserError;
 use scanner::ScannerError;
 
@@ -9,11 +10,12 @@ pub enum LoxError {
     Exit,
     Parser(ParserError),
     Scanner(ScannerError),
+    Interpreter(InterpreterError),
     Io(std::io::Error),
 }
 
 pub mod cli {
-    use crate::interpreter::interpret;
+    use crate::interpreter::Interpreter;
     use crate::parser::Statement;
     use crate::scanner::Token;
     use crate::{interpreter, LoxError};
@@ -47,7 +49,10 @@ pub mod cli {
 
         print_prompt();
         for line in io::stdin().lines() {
-            let _ = run(&line.expect("stdin should be readable!"));
+            let res = run(&line.expect("stdin should be readable!"));
+            if res.is_err(){
+                eprintln!("{:?}", res.unwrap_err());
+            }
             print_prompt();
         }
 
@@ -77,9 +82,8 @@ pub mod cli {
 
         let mut parser = Parser::new(&tokens);
         let res = parser.parse().map_err(LoxError::Parser)?;
-        for stmt in res {
-           interpreter::interpret(stmt);
-        }
+        let mut interp = Interpreter {};
+        interp.interpret(&res).map_err(LoxError::Interpreter)?;
 
         Ok(())
     }

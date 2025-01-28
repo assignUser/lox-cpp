@@ -1,5 +1,12 @@
 use std::fmt;
 use std::fmt::Display;
+use std::string::FromUtf8Error;
+
+use crate::LoxError;
+
+pub trait SourcePosition {
+    fn get_pos(&self) -> SourcePos;
+}
 
 type ScannerResult = Result<Token, ScannerError>;
 
@@ -91,10 +98,10 @@ impl AsciiSource<'_> {
     }
 
     pub fn build(source: &str) -> Result<AsciiSource, ScannerError> {
-        source
-            .is_ascii()
-            .then_some(())
-            .ok_or(ScannerError::NonAsciiCharacer)?;
+        // source
+        //     .is_ascii()
+        //     .then_some(())
+        //     .ok_or(ScannerError::NonAsciiCharacer)?;
 
         Ok(AsciiSource {
             source: source.as_bytes(),
@@ -303,10 +310,12 @@ impl Scanner<'_> {
             return None;
         }
 
+        let pos = self.source.current_pos(0);
+
         //Consume "
         self.source.shift(1);
 
-        let mut string = String::new();
+        let mut chars: Vec<u8> = vec![];
 
         loop {
             match self.peek(0) {
@@ -314,22 +323,24 @@ impl Scanner<'_> {
                     self.source.shift(1);
                     break;
                 }
-                None | Some(b'\n') => {
+                None => {
                     return Some(Err(ScannerError::UnterminatedString(
                         self.source.current_pos(0),
                     )));
                 }
                 Some(d) => {
-                    string.push(d as char);
+                    chars.push(d);
                     self.source.shift(1);
                 }
             }
         }
 
-        Some(Ok(Token::String {
-            pos: self.source.current_pos(string.len() + 2), // add 2 for the quotes
-            string,
-        }))
+        let string = match String::from_utf8(chars) {
+            Err(e) => return Some(Err(ScannerError::NonUTF8Character(e))),
+            Ok(s) => s,
+        };
+
+        Some(Ok(Token::String { pos, string }))
     }
 
     fn numbers(&mut self) -> Option<ScannerResult> {
@@ -427,6 +438,7 @@ impl Iterator for Scanner<'_> {
 pub enum ScannerError {
     #[default]
     NonAsciiCharacer,
+    NonUTF8Character(FromUtf8Error),
     NumberParsingError,
     UnexpectedCharacter(SourcePos),
     UnterminatedString(SourcePos),
@@ -438,6 +450,9 @@ impl Display for ScannerError {
             ScannerError::NonAsciiCharacer => {
                 write!(f, "Non-ASCII character encountered")
             }
+            ScannerError::NonUTF8Character(_) => {
+                write!(f, "Non-UTF8 character encountered")
+            }
             ScannerError::NumberParsingError => {
                 write!(f, "Number parsing error")
             }
@@ -445,7 +460,7 @@ impl Display for ScannerError {
                 write!(f, "Unexpected character at {}", pos)
             }
             ScannerError::UnterminatedString(pos) => {
-                write!(f, "Unterminated string at {}", pos)
+                write!(f, "[line {}] Error: Unterminated string.", pos.row)
             }
         }
     }
@@ -498,6 +513,52 @@ pub enum Token {
     String { string: String, pos: SourcePos },
     Number { value: f64, pos: SourcePos },
     Eof,
+}
+
+impl SourcePosition for Token {
+    fn get_pos(&self) -> SourcePos {
+        match self {
+            Self::And(pos) => pos.clone(),
+            Self::Class(pos) => pos.clone(),
+            Self::Else(pos) => pos.clone(),
+            Self::False(pos) => pos.clone(),
+            Self::Fun(pos) => pos.clone(),
+            Self::For(pos) => pos.clone(),
+            Self::If(pos) => pos.clone(),
+            Self::Nil(pos) => pos.clone(),
+            Self::Or(pos) => pos.clone(),
+            Self::Print(pos) => pos.clone(),
+            Self::Return(pos) => pos.clone(),
+            Self::Super(pos) => pos.clone(),
+            Self::This(pos) => pos.clone(),
+            Self::True(pos) => pos.clone(),
+            Self::Var(pos) => pos.clone(),
+            Self::While(pos) => pos.clone(),
+            Self::Minus(pos) => pos.clone(),
+            Self::Plus(pos) => pos.clone(),
+            Self::Semicolon(pos) => pos.clone(),
+            Self::Slash(pos) => pos.clone(),
+            Self::Star(pos) => pos.clone(),
+            Self::Bang(pos) => pos.clone(),
+            Self::BangEqual(pos) => pos.clone(),
+            Self::Equal(pos) => pos.clone(),
+            Self::EqualEqual(pos) => pos.clone(),
+            Self::Greater(pos) => pos.clone(),
+            Self::GreaterEqual(pos) => pos.clone(),
+            Self::Less(pos) => pos.clone(),
+            Self::LessEqual(pos) => pos.clone(),
+            Self::LeftParen(pos) => pos.clone(),
+            Self::RightParen(pos) => pos.clone(),
+            Self::LeftBrace(pos) => pos.clone(),
+            Self::RightBrace(pos) => pos.clone(),
+            Self::Comma(pos) => pos.clone(),
+            Self::Dot(pos) => pos.clone(),
+            Self::Identifier { ident: _, pos } => pos.clone(),
+            Self::String { string: _, pos } => pos.clone(),
+            Self::Number { value: _, pos } => pos.clone(),
+            Token::Eof => SourcePos { row: 0, col: 0 },
+        }
+    }
 }
 
 impl Display for Token {
@@ -553,7 +614,8 @@ mod scanner_tests {
 
     #[test]
     fn scan_errors() {
-        assert_eq!(scan("hallö"), Err(ScannerError::NonAsciiCharacer));
+        assert_eq!(scan("hallß"), Err(ScannerError::NonAsciiCharacer));
+
         let mut errors = Scanner {
             source: AsciiSource::build("@@\n #").unwrap(),
         };
@@ -716,10 +778,9 @@ mod scanner_tests {
         assert_eq!(empty_scanner.next(), None);
 
         let mut strings = Scanner {
-            source: AsciiSource::build("5 \"This is a string\"").unwrap(),
+            source: AsciiSource::build("5 \"This is a string\"\n\"A~¶Þॐஃ\"").unwrap(),
         };
         assert!(strings.next().unwrap().is_ok());
-
         assert_eq!(
             strings.next(),
             Some(SR::Ok(Token::String {
@@ -768,7 +829,7 @@ mod scanner_tests {
         );
         assert_eq!(
             double_ops.next(),
-            Some(SR::Ok(Token::BangEqual(SourcePos { row: 1, col: 4 })))
+            Some(SR::Ok(Token::BangEqual(SourcePos { row: 1, col: 4 }))),
         );
         assert_eq!(
             double_ops.next(),

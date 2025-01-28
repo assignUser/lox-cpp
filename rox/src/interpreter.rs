@@ -1,14 +1,24 @@
 use crate::parser::{Expression, Function, Statement, Value};
-use crate::scanner::{SourcePos, Token};
+use crate::scanner::{SourcePos, SourcePosition, Token};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::Read;
 
 use crate::LoxError;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ReturnValue {
     Value(Value),
     Function(Function),
+}
+
+impl SourcePosition for ReturnValue {
+    fn get_pos(&self) -> SourcePos {
+        match self {
+            Self::Value(v) => v.get_pos(),
+            Self::Function(f) => f.get_pos(),
+        }
+    }
 }
 
 impl Display for ReturnValue {
@@ -20,8 +30,33 @@ impl Display for ReturnValue {
     }
 }
 
+impl PartialEq for ReturnValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ReturnValue::Value(a), ReturnValue::Value(b)) => a == b,
+            (ReturnValue::Function(a), ReturnValue::Function(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum InterpreterError {
     Error,
+    UnexpectedValue { msg: String, pos: SourcePos },
+    InvalidOperand { msg: String, pos: SourcePos },
+    InvalidOperator { msg: String, pos: SourcePos },
+}
+
+impl Display for InterpreterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Error => write!(f, "Error"),
+            Self::UnexpectedValue { msg, pos } => write!(f, "{msg}\n[line {0}]", pos.row),
+            Self::InvalidOperator { msg, pos } => write!(f, "{msg}\n[line {0}]", pos.row),
+            Self::InvalidOperand { msg, pos } => write!(f, "{msg}\n[line {0}]", pos.row),
+        }
+    }
 }
 
 pub trait Interpretable {
@@ -35,26 +70,35 @@ pub trait Interpretable {
 // Print(Expression),
 // Return,
 // While,
-pub fn interpret(stmt: Statement) -> Result<ReturnValue, InterpreterError> {
-    match stmt {
-        Statement::Print(expr) => {
-            println!("{}", expr.eval()?);
-            Ok(ReturnValue::Value(Value::Nil(SourcePos { row: 0, col: 0 })))
-        }
-        Statement::Expression(expr) => Ok(expr.eval()?),
-        _ => todo!(),
-    }
+pub struct Interpreter {
+    // scopes: HashMap<SourcePos, HashMap<&str>>,
 }
 
+impl Interpreter {
+    pub fn interpret(&mut self, statements: &Vec<Statement>) -> Result<(), InterpreterError> {
+        for stmt in statements {
+            self.execute(stmt)?;
+        }
+
+        Ok(())
+    }
+
+    fn execute(&mut self, statement: &Statement) -> Result<ReturnValue, InterpreterError> {
+        match statement {
+            Statement::Print(expr) => {
+                println!("{}", expr.eval()?);
+                Ok(ReturnValue::Value(Value::Nil(SourcePos { row: 0, col: 0 })))
+            }
+            Statement::Expression(expr) => Ok(expr.eval()?),
+            _ => todo!(),
+        }
+    }
+}
 // Assign {
 //     name: Identifier,
 //     value: Box<Expression>,
 // },
-// Binary {
-//     lhs: Box<Expression>,
-//     operator: Token,
-//     rhs: Box<Expression>,
-// },
+
 // Call {
 //     callee: Identifier,
 //     arguments: Option<Vec<Expression>>,
@@ -97,14 +141,17 @@ fn eval_unary(operator: &Token, rhs: &Expression) -> Result<ReturnValue, Interpr
     let value = rhs.eval()?;
 
     match operator {
-        Token::Minus(_) => {
+        Token::Minus(p) => {
             if let ReturnValue::Value(Value::Number { value, pos }) = value {
                 Ok(ReturnValue::Value(Value::Number {
                     value: -value,
                     pos: pos.clone(),
                 }))
             } else {
-                Err(InterpreterError::Error) //TODO error msg
+                Err(InterpreterError::InvalidOperand {
+                    msg: "Operand must be a number.".to_string(),
+                    pos: p.clone(),
+                })
             }
         }
 
@@ -112,7 +159,10 @@ fn eval_unary(operator: &Token, rhs: &Expression) -> Result<ReturnValue, Interpr
             value: !is_truthy(&value),
             pos: pos.clone(),
         })),
-        _ => Err(InterpreterError::Error), //TODO error msg
+        _ => Err(InterpreterError::InvalidOperator {
+            msg: format!("Invalid operator '{}' for unary expression.", operator),
+            pos: operator.get_pos(),
+        }),
     }
 }
 
@@ -128,16 +178,6 @@ fn is_nil(value: &ReturnValue) -> bool {
     matches!(value, ReturnValue::Value(Value::Nil(_)))
 }
 
-fn are_equal(lhs: &ReturnValue, rhs: &ReturnValue) -> bool {
-    if is_nil(lhs) && is_nil(rhs) {
-        true
-    } else if is_nil(lhs) {
-        false
-    } else {
-        lhs == rhs
-    }
-}
-
 fn eval_binary(
     lhs: &Expression,
     operator: &Token,
@@ -148,8 +188,21 @@ fn eval_binary(
 
     let get_float = |v: &ReturnValue| -> Result<f64, InterpreterError> {
         match v {
-            ReturnValue::Value(Value::Number { value, pos }) => Ok(*value),
-            _ => Err(InterpreterError::Error),
+            ReturnValue::Value(Value::Number { value, pos: _ }) => Ok(*value),
+            _ => Err(InterpreterError::UnexpectedValue {
+                msg: format!("Expect 'Number', found {v}"),
+                pos: v.get_pos(),
+            }),
+        }
+    };
+
+    let get_string = |v: &ReturnValue| -> Result<String, InterpreterError> {
+        match v {
+            ReturnValue::Value(Value::String { value, pos: _ }) => Ok(value.clone()),
+            _ => Err(InterpreterError::UnexpectedValue {
+                msg: format!("Expect 'String', found {v}"),
+                pos: v.get_pos(),
+            }),
         }
     };
 
@@ -163,69 +216,136 @@ fn eval_binary(
             pos: p.clone(),
         })),
         Token::EqualEqual(p) => Ok(ReturnValue::Value(Value::Boolean {
-            value: are_equal(&lhs, &rhs),
+            value: lhs == rhs,
             pos: p.clone(),
         })),
         Token::BangEqual(p) => Ok(ReturnValue::Value(Value::Boolean {
-            value: !are_equal(&lhs, &rhs),
+            value: lhs != rhs,
             pos: p.clone(),
         })),
-        Token::Less(p) => Ok(ReturnValue::Value(Value::Boolean {
-            value: get_float(&lhs)? < get_float(&rhs)?,
-            pos: p.clone(),
-        })),
-        Token::LessEqual(p) => Ok(ReturnValue::Value(Value::Boolean {
-            value: get_float(&lhs)? <= get_float(&rhs)?,
-            pos: p.clone(),
-        })),
-        Token::Greater(p) => Ok(ReturnValue::Value(Value::Boolean {
-            value: get_float(&lhs)? > get_float(&rhs)?,
-            pos: p.clone(),
-        })),
-        Token::GreaterEqual(p) => Ok(ReturnValue::Value(Value::Boolean {
-            value: get_float(&lhs)? >= get_float(&rhs)?,
-            pos: p.clone(),
-        })),
-        Token::Minus(p) => Ok(ReturnValue::Value(Value::Number {
-            value: get_float(&lhs)? - get_float(&rhs)?,
-            pos: p.clone(),
-        })),
-        Token::Plus(p) => match lhs {
-            ReturnValue::Value(Value::Number { value, ref pos }) => {
-                if !matches!(&rhs, ReturnValue::Value(Value::Number { .. })) {
-                    Err(InterpreterError::Error)
-                } else {
-                    Ok(ReturnValue::Value(Value::Number {
-                        value: value + get_float(&rhs)?,
-                        pos: pos.clone(),
-                    }))
-                }
-            }
-            ReturnValue::Value(Value::String { value, ref pos }) => {
-                let rhs = if let ReturnValue::Value(Value::String { value, pos }) = rhs {
-                    value.clone()
-                } else {
-                    return Err(InterpreterError::Error);
-                };
+        Token::Less(p)
+            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+        {
+            Ok(ReturnValue::Value(Value::Boolean {
+                value: get_float(&lhs)? < get_float(&rhs)?,
+                pos: p.clone(),
+            }))
+        }
+        Token::LessEqual(p)
+            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+        {
+            Ok(ReturnValue::Value(Value::Boolean {
+                value: get_float(&lhs)? <= get_float(&rhs)?,
+                pos: p.clone(),
+            }))
+        }
+        Token::Greater(p)
+            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+        {
+            Ok(ReturnValue::Value(Value::Boolean {
+                value: get_float(&lhs)? > get_float(&rhs)?,
+                pos: p.clone(),
+            }))
+        }
+        Token::GreaterEqual(p)
+            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+        {
+            Ok(ReturnValue::Value(Value::Boolean {
+                value: get_float(&lhs)? >= get_float(&rhs)?,
+                pos: p.clone(),
+            }))
+        }
+        Token::Minus(p)
+            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+        {
+            Ok(ReturnValue::Value(Value::Number {
+                value: get_float(&lhs)? - get_float(&rhs)?,
+                pos: p.clone(),
+            }))
+        }
 
-                Ok(ReturnValue::Value(Value::String {
-                    // is this clone needed?
-                    value: value.clone() + &rhs,
-                    pos: p.clone(),
-                }))
-            }
-            _ => Err(InterpreterError::Error),
-            
-
-        },
-        Token::Star(p) => Ok(ReturnValue::Value(Value::Number {
-            value: get_float(&lhs)? * get_float(&rhs)?,
-            pos: p.clone(),
-        })),
-        Token::Slash(p) => Ok(ReturnValue::Value(Value::Number {
-            value: get_float(&lhs)? / get_float(&rhs)?,
-            pos: p.clone(),
-        })),
-        _ => todo!(),
+        Token::Star(p)
+            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+        {
+            Ok(ReturnValue::Value(Value::Number {
+                value: get_float(&lhs)? * get_float(&rhs)?,
+                pos: p.clone(),
+            }))
+        }
+        Token::Slash(p)
+            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+        {
+            Ok(ReturnValue::Value(Value::Number {
+                value: get_float(&lhs)? / get_float(&rhs)?,
+                pos: p.clone(),
+            }))
+        }
+        Token::Slash(_)
+        | Token::Star(_)
+        | Token::Greater(_)
+        | Token::GreaterEqual(_)
+        | Token::Less(_)
+        | Token::LessEqual(_)
+        | Token::Minus(_) => Err(InterpreterError::InvalidOperand {
+            msg: "Operands must be numbers.".to_string(),
+            pos: lhs.get_pos(),
+        }),
+        Token::Plus(_)
+            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+        {
+            Ok(ReturnValue::Value(Value::Number {
+                value: get_float(&lhs)? + get_float(&rhs)?,
+                pos: lhs.get_pos(),
+            }))
+        }
+        Token::Plus(_)
+            if matches!(lhs, ReturnValue::Value(Value::String { .. }))
+                && matches!(rhs, ReturnValue::Value(Value::String { .. })) =>
+        {
+            Ok(ReturnValue::Value(Value::String {
+                value: get_string(&lhs)? + &get_string(&rhs)?,
+                pos: lhs.get_pos(),
+            }))
+        }
+        Token::Plus(_) => Err(InterpreterError::InvalidOperand {
+            msg: "Operands must be two numbers or two strings.".to_string(),
+            pos: lhs.get_pos(),
+        }),
+        _ => unreachable!("Binary expression only constructed with specific tokens."),
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     #[test]
+//     fn binary_test() {
+//         // let expr = Expression::Binary {
+//         //     lhs: Box::new(Expression::Literal(Value::Number {
+//         //         value: 5.0,
+//         //         pos: SourcePos { row: 1, col: 1 },
+//         //     })),
+//         //     operator: Token::Plus(SourcePos { row: 1, col: 3 }),
+//         //     rhs: Box::new(Expression::Literal(Value::Number {
+//         //         value: 7.0,
+//         //         pos: SourcePos { row: 1, col: 5 },
+//         //     })),
+//         // };
+//         // dbg!(expr.eval().unwrap());
+//         let expr = Statement::Print(Expression::Literal(Value::String {
+//             value: "Hello, world!".to_string(),
+//             pos: SourcePos { row: 0, col: 0 },
+//         }));
+//         interpret(expr);
+//         assert!(false);
+//     }
+// }

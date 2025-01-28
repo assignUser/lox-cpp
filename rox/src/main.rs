@@ -1,5 +1,5 @@
-use std::env;
 use std::backtrace::Backtrace;
+use std::env;
 use std::process;
 
 fn main() {
@@ -7,9 +7,17 @@ fn main() {
 
     match result {
         Ok(()) => (),
+        Err(rox::LoxError::Interpreter(e)) => {
+            eprintln!("{e}");
+            process::exit(70)
+        }
+        Err(rox::LoxError::Parser(e)) => {
+            eprintln!("{e}");
+            process::exit(65)
+        }
         Err(e) => {
-            eprintln!("Application error: {e:#?}");
-            process::exit(1);
+            // eprintln!("Application error: {e:#?}");
+            process::exit(65);
         }
     }
 }

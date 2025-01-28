@@ -1,7 +1,7 @@
 use core::slice::Iter;
 use std::{fmt::Display, iter::Peekable};
 
-use crate::scanner::{SourcePos, Token};
+use crate::scanner::{SourcePos, SourcePosition, Token};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Identifier {
@@ -64,6 +64,12 @@ pub struct Function {
     body: Block,
 }
 
+impl SourcePosition for Function {
+    fn get_pos(&self) -> SourcePos {
+        self.name.pos.clone()
+    }
+}
+
 impl Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "fn {}", self.name.name)
@@ -121,12 +127,62 @@ pub enum Expression {
     Literal(Value),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Value {
     Boolean { value: bool, pos: SourcePos },
     Nil(SourcePos),
     Number { value: f64, pos: SourcePos },
     String { value: String, pos: SourcePos },
+}
+
+impl SourcePosition for Value {
+    fn get_pos(&self) -> SourcePos {
+        match self {
+            Self::String { value: _, pos } => pos.clone(),
+            Self::Boolean { value: _, pos } => pos.clone(),
+            Self::Number { value: _, pos } => pos.clone(),
+            Self::Nil(pos) => pos.clone(),
+        }
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Value::Boolean {
+                    value: self_v,
+                    pos: _,
+                },
+                Value::Boolean {
+                    value: other_v,
+                    pos: _,
+                },
+            ) => self_v == other_v,
+            (
+                Value::Number {
+                    value: self_v,
+                    pos: _,
+                },
+                Value::Number {
+                    value: other_v,
+                    pos: _,
+                },
+            ) => self_v == other_v,
+            (
+                Value::String {
+                    value: self_v,
+                    pos: _,
+                },
+                Value::String {
+                    value: other_v,
+                    pos: _,
+                },
+            ) => self_v == other_v,
+            (Value::Nil(_), Value::Nil(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 impl Display for Value {
@@ -147,6 +203,22 @@ pub enum ParserError {
     UnexpectedToken { token: Token, message: String },
     Syntax { token: Token, message: String },
     UnexpectedStatement { stmt: Statement, message: String },
+}
+
+impl Display for ParserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Error => write!(f, "Error"),
+            Self::UnexpectedEof => write!(f, "Unexpected end of file."),
+            Self::UnexpectedToken { token, message } => write!(
+                f,
+                "[line {0}] Error at '{token}': {message}",
+                token.get_pos().row
+            ),
+            Self::UnexpectedStatement { stmt, message } => write!(f, "Unexpected Statement."),
+            Self::Syntax { token, message } => write!(f, "Syntax error."),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -342,7 +414,6 @@ impl<'a> Parser<'a> {
         if decl.is_err() {
             self.synchronize();
         }
-        dbg!(&decl);
         decl
     }
 
@@ -877,7 +948,7 @@ impl<'a> Parser<'a> {
             _ => {
                 return Err(ParserError::UnexpectedToken {
                     token: token.clone(),
-                    message: "Expect expressions.".to_owned(),
+                    message: "Expect expression.".to_owned(),
                 })
             }
         };
