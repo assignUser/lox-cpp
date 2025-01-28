@@ -1,0 +1,3 @@
+[submodule "craftinginterpreters"]
+	path = rox/tests/craftinginterpreters
+	url = https://github.com/munificent/craftinginterpreters/
