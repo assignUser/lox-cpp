@@ -1,24 +1,29 @@
 mod interpreter;
 mod parser;
+mod resolver;
 mod scanner;
+
 use interpreter::InterpreterError;
 use parser::ParserError;
+use resolver::ResolverError;
 use scanner::ScannerError;
 
 #[derive(Debug)]
 pub enum LoxError {
     Exit,
-    Parser(ParserError),
     Scanner(ScannerError),
+    Parser(ParserError),
+    Resolver(ResolverError),
     Interpreter(InterpreterError),
     Io(std::io::Error),
 }
 
 pub mod cli {
     use crate::interpreter::Interpreter;
-    use crate::parser::Statement;
+    
+    use crate::resolver::Resolver;
     use crate::scanner::Token;
-    use crate::{interpreter, LoxError};
+    use crate::LoxError;
     use crate::{parser::Parser, scanner::ScannerError};
 
     use super::scanner;
@@ -50,7 +55,7 @@ pub mod cli {
         print_prompt();
         for line in io::stdin().lines() {
             let res = run(&line.expect("stdin should be readable!"));
-            if res.is_err(){
+            if res.is_err() {
                 eprintln!("{:?}", res.unwrap_err());
             }
             print_prompt();
@@ -66,7 +71,7 @@ pub mod cli {
     }
 
     fn run(source: &str) -> Result<(), LoxError> {
-        use crate::interpreter::Interpretable;
+        
         let tokens = scanner::scan(source).map_err(LoxError::Scanner)?;
 
         let errors: Vec<ScannerError> = tokens
@@ -81,9 +86,13 @@ pub mod cli {
         }
 
         let mut parser = Parser::new(&tokens);
-        let res = parser.parse().map_err(LoxError::Parser)?;
-        let mut interp = Interpreter {};
-        interp.interpret(&res).map_err(LoxError::Interpreter)?;
+        let mut statements = parser.parse().map_err(LoxError::Parser)?;
+        
+        let mut resolver = Resolver::new();
+        resolver.resolve(&mut statements).map_err(LoxError::Resolver)?;
+
+        let mut interp = Interpreter::new();
+        interp.interpret(&statements).map_err(LoxError::Interpreter)?;
 
         Ok(())
     }

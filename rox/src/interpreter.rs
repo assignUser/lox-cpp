@@ -1,15 +1,20 @@
-use crate::parser::{Expression, Function, Statement, Value};
+use crate::parser::{Class, Expression, Function, Statement, Value};
 use crate::scanner::{SourcePos, SourcePosition, Token};
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::io::Read;
 
-use crate::LoxError;
 
 #[derive(Debug, Clone)]
 pub enum ReturnValue {
     Value(Value),
     Function(Function),
+}
+
+#[derive(Debug, Clone)]
+pub enum Variable {
+    Value(Value),
+    Function(Function),
+    Class(Class),
 }
 
 impl SourcePosition for ReturnValue {
@@ -71,10 +76,20 @@ pub trait Interpretable {
 // Return,
 // While,
 pub struct Interpreter {
-    // scopes: HashMap<SourcePos, HashMap<&str>>,
+    globals: HashMap<String, Variable>,
+    scopes: HashMap<SourcePos, HashMap<String, Variable>>,
+    stack: Vec<SourcePos>,
 }
 
 impl Interpreter {
+    pub fn new() -> Self {
+        Self {
+            globals: HashMap::new(),
+            scopes: HashMap::new(),
+            stack: vec![],
+        }
+    }
+
     pub fn interpret(&mut self, statements: &Vec<Statement>) -> Result<(), InterpreterError> {
         for stmt in statements {
             self.execute(stmt)?;
@@ -94,6 +109,7 @@ impl Interpreter {
         }
     }
 }
+
 // Assign {
 //     name: Identifier,
 //     value: Box<Expression>,

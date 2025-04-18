@@ -5,26 +5,14 @@ use crate::scanner::{SourcePos, SourcePosition, Token};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Identifier {
-    name: String,
-    pos: SourcePos,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Initializer {
-    Expression(Expression),
-    Var(Var),
+    pub name: String,
+    pub pos: SourcePos,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Block(Block),
     Expression(Expression),
-    For {
-        initializer: Option<Initializer>,
-        condition: Option<Expression>,
-        increment: Option<Expression>,
-        body: Box<Statement>,
-    },
     If {
         condition: Expression,
         then_branch: Box<Statement>,
@@ -46,22 +34,22 @@ pub enum Statement {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
-    body: Vec<Statement>,
-    key: SourcePos,
+    pub body: Vec<Statement>,
+    pub key: SourcePos,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Class {
-    name: Identifier,
-    parent: Option<Identifier>,
-    methods: Vec<Function>,
+    pub name: Identifier,
+    pub parent: Option<Identifier>,
+    pub methods: Vec<Function>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
-    name: Identifier,
-    parameters: Option<Vec<Identifier>>,
-    body: Block,
+    pub name: Identifier,
+    pub parameters: Option<Vec<Identifier>>,
+    pub body: Block,
 }
 
 impl SourcePosition for Function {
@@ -78,8 +66,8 @@ impl Display for Function {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Var {
-    name: Identifier,
-    initializer: Option<Expression>,
+    pub name: Identifier,
+    pub initializer: Option<Expression>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -87,6 +75,7 @@ pub enum Expression {
     Assign {
         name: Identifier,
         value: Box<Expression>,
+        scope_depth: Option<usize>,
     },
     Binary {
         lhs: Box<Expression>,
@@ -123,6 +112,7 @@ pub enum Expression {
     },
     Variable {
         name: Identifier,
+        scope_depth: Option<usize>,
     },
     Literal(Value),
 }
@@ -215,8 +205,14 @@ impl Display for ParserError {
                 "[line {0}] Error at '{token}': {message}",
                 token.get_pos().row
             ),
-            Self::UnexpectedStatement { stmt, message } => write!(f, "Unexpected Statement."),
-            Self::Syntax { token, message } => write!(f, "Syntax error."),
+            Self::UnexpectedStatement {
+                stmt: _,
+                message: _,
+            } => write!(f, "Unexpected Statement."),
+            Self::Syntax {
+                token: _,
+                message: _,
+            } => write!(f, "Syntax error."),
         }
     }
 }
@@ -548,9 +544,10 @@ impl<'a> Parser<'a> {
 
     fn statement(&mut self) -> Result<Statement, ParserError> {
         match self.peek() {
-            Token::For(_) => {
+            Token::For(pos) => {
+                let sp = pos.clone();
                 self.iter.next();
-                self.for_stmt()
+                self.for_stmt(sp)
             }
             Token::If(_) => {
                 self.iter.next();
@@ -592,26 +589,35 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn for_stmt(&mut self) -> Result<Statement, ParserError> {
+    fn for_stmt(&mut self, pos: SourcePos) -> Result<Statement, ParserError> {
         consume!(self, LeftParen(_pos), _pos, "Expect '(' after 'for'.")?;
+
+        let mut for_body = vec![];
 
         let initializer = match self.peek() {
             Token::Semicolon(_) => None,
             Token::Var(_) => {
                 self.iter.next();
-                Some(Initializer::Var(take_variant!(self.variable()?, Var)?))
+                Some(Statement::Var(take_variant!(self.variable()?, Var)?))
             }
-            _ => Some(Initializer::Expression(take_variant!(
+            _ => Some(Statement::Expression(take_variant!(
                 self.expr_stmt()?,
                 Expression
             )?)),
         };
 
-        let mut condition = None;
-        if let Token::Semicolon(_) = self.peek() {
-            // no condition
+        if let Some(init) = initializer {
+            for_body.push(init);
+        }
+
+        let condition;
+        if let Token::Semicolon(pos) = self.peek() {
+            condition = Expression::Literal(Value::Boolean {
+                value: true,
+                pos: pos.clone(),
+            });
         } else {
-            condition = Some(take_variant!(self.expression()?, Expression)?);
+            condition = take_variant!(self.expression()?, Expression)?;
         }
 
         consume!(
@@ -621,24 +627,33 @@ impl<'a> Parser<'a> {
             "Expect ';' after loop condition."
         )?;
 
-        let mut increment = None;
-        if let Token::RightParen(_) = self.peek() {
-            // no increment
-        }
-        {
-            increment = Some(take_variant!(self.expression()?, Expression)?);
-        }
+        let mut while_body = vec![];
+        let while_pos;
 
+        if let Token::RightParen(ppos) = self.peek() {
+            while_pos = ppos.clone();
+            // no increment
+        } else {
+            let increment = take_variant!(self.expression()?, Expression)?;
+            while_body.push(Statement::Expression(increment));
+            while_pos = self.peek().get_pos();
+        }
         consume!(self, RightParen(_pos), (), "Expect ')' after for clauses.")?;
 
-        let body = Box::new(self.statement()?);
+        while_body.insert(0, self.statement()?);
 
-        Ok(Statement::For {
-            initializer,
+        for_body.push(Statement::While {
             condition,
-            increment,
-            body,
-        })
+            body: Box::new(Statement::Block(Block {
+                key: while_pos,
+                body: while_body,
+            })),
+        });
+
+        Ok(Statement::Block(Block {
+            key: pos,
+            body: for_body,
+        }))
     }
 
     fn if_stmt(&mut self) -> Result<Statement, ParserError> {
@@ -733,10 +748,11 @@ impl<'a> Parser<'a> {
             let value = self.assignment()?;
 
             match var {
-                Statement::Expression(Expression::Variable { name: n }) => {
+                Statement::Expression(Expression::Variable { name: n, .. }) => {
                     return Ok(Statement::Expression(Expression::Assign {
                         name: n,
                         value: self.box_expression(value)?,
+                        scope_depth: None,
                     }));
                 }
                 Statement::Expression(Expression::Get { name, object }) => {
@@ -921,6 +937,7 @@ impl<'a> Parser<'a> {
                     name: ident.clone(),
                     pos: pos.clone(),
                 },
+                scope_depth: None,
             }),
             Token::Super(_) => {
                 consume!(self, Dot(_pos), _pos, "Expect '.' after 'super'.")?;
