@@ -1,20 +1,15 @@
-use crate::parser::{Class, Expression, Function, Statement, Value};
+use crate::parser::{Class, Expression, Function, Identifier, Statement, Value};
 use crate::scanner::{SourcePos, SourcePosition, Token};
+use crate::take_variant;
 use std::collections::HashMap;
 use std::fmt::Display;
 
-
 #[derive(Debug, Clone)]
 pub enum ReturnValue {
+    Return(Box<ReturnValue>),
     Value(Value),
     Function(Function),
-}
-
-#[derive(Debug, Clone)]
-pub enum Variable {
-    Value(Value),
-    Function(Function),
-    Class(Class),
+    // Class(Class),
 }
 
 impl SourcePosition for ReturnValue {
@@ -22,6 +17,7 @@ impl SourcePosition for ReturnValue {
         match self {
             Self::Value(v) => v.get_pos(),
             Self::Function(f) => f.get_pos(),
+            Self::Return(r) => r.get_pos(),
         }
     }
 }
@@ -31,6 +27,7 @@ impl Display for ReturnValue {
         match self {
             Self::Value(value) => value.fmt(f),
             Self::Function(function) => function.fmt(f),
+            Self::Return(r) => r.fmt(f),
         }
     }
 }
@@ -64,20 +61,11 @@ impl Display for InterpreterError {
     }
 }
 
-pub trait Interpretable {
-    fn eval(&self) -> Result<ReturnValue, InterpreterError>;
-}
+type Scope = HashMap<String, ReturnValue>;
 
-// Block,
-// Expression(Expression),
-// For,
-// If,
-// Print(Expression),
-// Return,
-// While,
 pub struct Interpreter {
-    globals: HashMap<String, Variable>,
-    scopes: HashMap<SourcePos, HashMap<String, Variable>>,
+    globals: Scope,
+    locals: HashMap<SourcePos, Scope>,
     stack: Vec<SourcePos>,
 }
 
@@ -85,7 +73,7 @@ impl Interpreter {
     pub fn new() -> Self {
         Self {
             globals: HashMap::new(),
-            scopes: HashMap::new(),
+            locals: HashMap::new(),
             stack: vec![],
         }
     }
@@ -98,87 +86,424 @@ impl Interpreter {
         Ok(())
     }
 
-    fn execute(&mut self, statement: &Statement) -> Result<ReturnValue, InterpreterError> {
+    // For,
+    // Return,
+    // execute a statement
+    fn execute(&mut self, statement: &Statement) -> Result<Option<ReturnValue>, InterpreterError> {
         match statement {
+            Statement::Block(block) => {
+                self.stack.push(block.key.clone());
+                self.locals.insert(block.key.clone(), HashMap::new());
+
+                for stmt in block.body.iter() {
+                    let result = self.execute(stmt)?;
+                    if let Some(ReturnValue::Return(value)) = result {
+                        self.pop_frame();
+                        return Ok(Some(*value));
+                    }
+                }
+                self.pop_frame();
+            }
+            Statement::Expression(expr) => {
+                return Ok(Some(self.evaluate(expr)?));
+            }
             Statement::Print(expr) => {
-                println!("{}", expr.eval()?);
-                Ok(ReturnValue::Value(Value::Nil(SourcePos { row: 0, col: 0 })))
+                println!("{}", self.evaluate(expr)?);
             }
-            Statement::Expression(expr) => Ok(expr.eval()?),
+            Statement::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                if is_truthy(&self.evaluate(condition)?) {
+                    let result = self.execute(then_branch)?;
+                    if result.is_some() {
+                        return Ok(result);
+                    }
+                } else if let Some(else_branch) = else_branch {
+                    let result = self.execute(else_branch)?;
+                    if result.is_some() {
+                        return Ok(result);
+                    }
+                }
+            }
+            Statement::Return { keyword, value } => {
+                if let Some(value) = value {
+                    return Ok(Some(ReturnValue::Return(Box::new(self.evaluate(value)?))));
+                }
+            }
+            Statement::Var(var) => {
+                if let Some(init) = &var.initializer {
+                    let init = self.evaluate(init)?;
+
+                    self.assign_var(&var.name, init)?;
+                } else {
+                    self.assign_var(
+                        &var.name,
+                        ReturnValue::Value(Value::Nil(SourcePos { row: 0, col: 0 })),
+                    )?;
+                }
+            }
             _ => todo!(),
+        };
+
+        Ok(None)
+    }
+
+    fn assign_var(
+        &mut self,
+        name: &Identifier,
+        value: ReturnValue,
+    ) -> Result<(), InterpreterError> {
+        if self.stack.is_empty() {
+            self.assign_global(name, value)?;
+        } else {
+            self.assign_local(0, name, value)?;
+        }
+
+        Ok(())
+    }
+
+    fn pop_frame(&mut self) {
+        self.stack.pop();
+        // Clean up local scopes once back to global
+        if self.stack.is_empty() {
+            self.locals.clear();
         }
     }
-}
 
-// Assign {
-//     name: Identifier,
-//     value: Box<Expression>,
-// },
-
-// Call {
-//     callee: Identifier,
-//     arguments: Option<Vec<Expression>>,
-//     pos: SourcePos,
-// },
-// Get {
-//     name: Identifier,
-//     object: Box<Expression>,
-// },
-
-// Set {
-//     value: Box<Expression>,
-//     name: Identifier,
-//     object: Box<Expression>,
-// },
-// Super {
-//     keyword: Token,
-//     method: Identifier,
-// },
-// This {
-//     keyword: Token,
-// },
-// Variable {
-//     name: Identifier,
-// },
-// Literal(Value),
-impl Interpretable for Expression {
-    fn eval(&self) -> Result<ReturnValue, InterpreterError> {
-        match self {
+    // evaluate an expression
+    pub fn evaluate(&mut self, expr: &Expression) -> Result<ReturnValue, InterpreterError> {
+        match expr {
             Expression::Literal(value) => Ok(ReturnValue::Value(value.clone())),
-            Expression::Unary { operator, rhs } => eval_unary(operator, rhs),
-            Expression::Grouping { expr } => expr.eval(),
-            Expression::Binary { lhs, operator, rhs } => eval_binary(lhs, operator, rhs),
+            Expression::Unary { operator, rhs } => self.eval_unary(operator, rhs),
+            Expression::Grouping { expr } => self.evaluate(expr),
+            Expression::Binary { lhs, operator, rhs } => self.eval_binary(lhs, operator, rhs),
+            Expression::Assign {
+                name,
+                value,
+                scope_depth,
+            } => self.eval_assign(name, value, scope_depth),
+            Expression::Variable { name, scope_depth } => self.lookup_variable(name, scope_depth),
             _ => todo!(),
         }
     }
-}
 
-fn eval_unary(operator: &Token, rhs: &Expression) -> Result<ReturnValue, InterpreterError> {
-    let value = rhs.eval()?;
+    // Assign {
+    //     name: Identifier,
+    //     value: Box<Expression>,
+    // },
 
-    match operator {
-        Token::Minus(p) => {
-            if let ReturnValue::Value(Value::Number { value, pos }) = value {
-                Ok(ReturnValue::Value(Value::Number {
-                    value: -value,
-                    pos: pos.clone(),
-                }))
-            } else {
-                Err(InterpreterError::InvalidOperand {
-                    msg: "Operand must be a number.".to_string(),
-                    pos: p.clone(),
-                })
-            }
+    // Call {
+    //     callee: Identifier,
+    //     arguments: Option<Vec<Expression>>,
+    //     pos: SourcePos,
+    // },
+    // Get {
+    //     name: Identifier,
+    //     object: Box<Expression>,
+    // },
+
+    // Set {
+    //     value: Box<Expression>,
+    //     name: Identifier,
+    //     object: Box<Expression>,
+    // },
+    // Super {
+    //     keyword: Token,
+    //     method: Identifier,
+    // },
+    // This {
+    //     keyword: Token,
+    // },
+    // Variable {
+    //     name: Identifier,
+    // },
+    // Literal(Value),
+
+    fn assign_local(
+        &mut self,
+        scope_depth: usize,
+        name: &Identifier,
+        value: ReturnValue,
+    ) -> Result<(), InterpreterError> {
+        if self.stack.len() < scope_depth + 1 {
+            // assignment assumes more nested scopes than exist
+            dbg!("depth > stack");
+            return Err(InterpreterError::Error);
         }
 
-        Token::Bang(pos) => Ok(ReturnValue::Value(Value::Boolean {
-            value: !is_truthy(&value),
-            pos: pos.clone(),
-        })),
-        _ => Err(InterpreterError::InvalidOperator {
-            msg: format!("Invalid operator '{}' for unary expression.", operator),
-            pos: operator.get_pos(),
-        }),
+        let local_scope = self
+            .locals
+            .get_mut(&self.stack[self.stack.len() - (scope_depth + 1)]);
+
+        if let Some(local_scope) = local_scope {
+            local_scope.insert(name.name.clone(), value);
+        } else {
+            // missing expected scope
+            dbg!("missing expected scope");
+            return Err(InterpreterError::Error);
+        }
+
+        Ok(())
+    }
+
+    fn assign_global(
+        &mut self,
+        name: &Identifier,
+        value: ReturnValue,
+    ) -> Result<(), InterpreterError> {
+        self.globals.insert(name.name.clone(), value);
+
+        Ok(())
+    }
+
+    fn lookup_variable(
+        &self,
+        name: &Identifier,
+        scope_depth: &Option<usize>,
+    ) -> Result<ReturnValue, InterpreterError> {
+        if let Some(depth) = scope_depth {
+            let maybe_value = self.lookup_local(&name.name, *depth)?;
+
+            if let Some(value) = maybe_value {
+                return Ok(value);
+            }
+            // not found, must be global
+            self.lookup_global(&name.name)
+        } else {
+            self.lookup_global(&name.name)
+        }
+    }
+
+    fn lookup_global(&self, name: &String) -> Result<ReturnValue, InterpreterError> {
+        let value = self.globals.get(name);
+        if let Some(value) = value {
+            Ok(value.clone())
+        } else {
+            // add proper error
+            dbg!("undefined variable");
+            Err(InterpreterError::Error)
+        }
+    }
+
+    fn lookup_local(
+        &self,
+        name: &String,
+        depth: usize,
+    ) -> Result<Option<ReturnValue>, InterpreterError> {
+        for (_, scope_pos) in self.stack.iter().enumerate().rev().skip(depth) {
+            let value;
+
+            if let Some(local_scope) = self.locals.get(scope_pos) {
+                value = local_scope.get(name).cloned();
+            } else {
+                // missing expected scope
+                dbg!("missing expected scope");
+                return Err(InterpreterError::Error);
+            }
+
+            if value.is_some() {
+                return Ok(value);
+            }
+        }
+        Ok(None)
+    }
+
+    fn eval_assign(
+        &mut self,
+        name: &Identifier,
+        value: &Expression,
+        scope_depth: &Option<usize>,
+    ) -> Result<ReturnValue, InterpreterError> {
+        let value = self.evaluate(value)?;
+
+        if let Some(scope_depth) = scope_depth {
+            self.assign_local(*scope_depth, name, value.clone())?;
+        } else {
+            self.assign_global(name, value.clone())?;
+        }
+
+        Ok(value)
+    }
+
+    fn eval_unary(
+        &mut self,
+        operator: &Token,
+        rhs: &Expression,
+    ) -> Result<ReturnValue, InterpreterError> {
+        let value = self.evaluate(rhs)?;
+
+        match operator {
+            Token::Minus(p) => {
+                if let ReturnValue::Value(Value::Number { value, pos }) = value {
+                    Ok(ReturnValue::Value(Value::Number {
+                        value: -value,
+                        pos: pos.clone(),
+                    }))
+                } else {
+                    Err(InterpreterError::InvalidOperand {
+                        msg: "Operand must be a number.".to_string(),
+                        pos: p.clone(),
+                    })
+                }
+            }
+
+            Token::Bang(pos) => Ok(ReturnValue::Value(Value::Boolean {
+                value: !is_truthy(&value),
+                pos: pos.clone(),
+            })),
+            _ => Err(InterpreterError::InvalidOperator {
+                msg: format!("Invalid operator '{}' for unary expression.", operator),
+                pos: operator.get_pos(),
+            }),
+        }
+    }
+
+    fn eval_binary(
+        &mut self,
+        lhs: &Expression,
+        operator: &Token,
+        rhs: &Expression,
+    ) -> Result<ReturnValue, InterpreterError> {
+        let lhs = self.evaluate(lhs)?;
+        let rhs = self.evaluate(rhs)?;
+
+        let get_float = |v: &ReturnValue| -> Result<f64, InterpreterError> {
+            match v {
+                ReturnValue::Value(Value::Number { value, pos: _ }) => Ok(*value),
+                _ => Err(InterpreterError::UnexpectedValue {
+                    msg: format!("Expect 'Number', found {v}"),
+                    pos: v.get_pos(),
+                }),
+            }
+        };
+
+        let get_string = |v: &ReturnValue| -> Result<String, InterpreterError> {
+            match v {
+                ReturnValue::Value(Value::String { value, pos: _ }) => Ok(value.clone()),
+                _ => Err(InterpreterError::UnexpectedValue {
+                    msg: format!("Expect 'String', found {v}"),
+                    pos: v.get_pos(),
+                }),
+            }
+        };
+
+        match operator {
+            Token::And(p) => Ok(ReturnValue::Value(Value::Boolean {
+                value: is_truthy(&lhs) && is_truthy(&rhs),
+                pos: p.clone(),
+            })),
+            Token::Or(p) => Ok(ReturnValue::Value(Value::Boolean {
+                value: is_truthy(&lhs) || is_truthy(&rhs),
+                pos: p.clone(),
+            })),
+            Token::EqualEqual(p) => Ok(ReturnValue::Value(Value::Boolean {
+                value: lhs == rhs,
+                pos: p.clone(),
+            })),
+            Token::BangEqual(p) => Ok(ReturnValue::Value(Value::Boolean {
+                value: lhs != rhs,
+                pos: p.clone(),
+            })),
+            Token::Less(p)
+                if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                    && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+            {
+                Ok(ReturnValue::Value(Value::Boolean {
+                    value: get_float(&lhs)? < get_float(&rhs)?,
+                    pos: p.clone(),
+                }))
+            }
+            Token::LessEqual(p)
+                if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                    && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+            {
+                Ok(ReturnValue::Value(Value::Boolean {
+                    value: get_float(&lhs)? <= get_float(&rhs)?,
+                    pos: p.clone(),
+                }))
+            }
+            Token::Greater(p)
+                if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                    && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+            {
+                Ok(ReturnValue::Value(Value::Boolean {
+                    value: get_float(&lhs)? > get_float(&rhs)?,
+                    pos: p.clone(),
+                }))
+            }
+            Token::GreaterEqual(p)
+                if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                    && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+            {
+                Ok(ReturnValue::Value(Value::Boolean {
+                    value: get_float(&lhs)? >= get_float(&rhs)?,
+                    pos: p.clone(),
+                }))
+            }
+            Token::Minus(p)
+                if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                    && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+            {
+                Ok(ReturnValue::Value(Value::Number {
+                    value: get_float(&lhs)? - get_float(&rhs)?,
+                    pos: p.clone(),
+                }))
+            }
+
+            Token::Star(p)
+                if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                    && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+            {
+                Ok(ReturnValue::Value(Value::Number {
+                    value: get_float(&lhs)? * get_float(&rhs)?,
+                    pos: p.clone(),
+                }))
+            }
+            Token::Slash(p)
+                if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                    && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+            {
+                Ok(ReturnValue::Value(Value::Number {
+                    value: get_float(&lhs)? / get_float(&rhs)?,
+                    pos: p.clone(),
+                }))
+            }
+            Token::Slash(_)
+            | Token::Star(_)
+            | Token::Greater(_)
+            | Token::GreaterEqual(_)
+            | Token::Less(_)
+            | Token::LessEqual(_)
+            | Token::Minus(_) => Err(InterpreterError::InvalidOperand {
+                msg: "Operands must be numbers.".to_string(),
+                pos: lhs.get_pos(),
+            }),
+            Token::Plus(_)
+                if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
+                    && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
+            {
+                Ok(ReturnValue::Value(Value::Number {
+                    value: get_float(&lhs)? + get_float(&rhs)?,
+                    pos: lhs.get_pos(),
+                }))
+            }
+            Token::Plus(_)
+                if matches!(lhs, ReturnValue::Value(Value::String { .. }))
+                    && matches!(rhs, ReturnValue::Value(Value::String { .. })) =>
+            {
+                Ok(ReturnValue::Value(Value::String {
+                    value: get_string(&lhs)? + &get_string(&rhs)?,
+                    pos: lhs.get_pos(),
+                }))
+            }
+            Token::Plus(_) => Err(InterpreterError::InvalidOperand {
+                msg: "Operands must be two numbers or two strings.".to_string(),
+                pos: lhs.get_pos(),
+            }),
+            _ => unreachable!("Binary expression only constructed with specific tokens."),
+        }
     }
 }
 
@@ -192,151 +517,6 @@ fn is_truthy(value: &ReturnValue) -> bool {
 
 fn is_nil(value: &ReturnValue) -> bool {
     matches!(value, ReturnValue::Value(Value::Nil(_)))
-}
-
-fn eval_binary(
-    lhs: &Expression,
-    operator: &Token,
-    rhs: &Expression,
-) -> Result<ReturnValue, InterpreterError> {
-    let lhs = lhs.eval()?;
-    let rhs = rhs.eval()?;
-
-    let get_float = |v: &ReturnValue| -> Result<f64, InterpreterError> {
-        match v {
-            ReturnValue::Value(Value::Number { value, pos: _ }) => Ok(*value),
-            _ => Err(InterpreterError::UnexpectedValue {
-                msg: format!("Expect 'Number', found {v}"),
-                pos: v.get_pos(),
-            }),
-        }
-    };
-
-    let get_string = |v: &ReturnValue| -> Result<String, InterpreterError> {
-        match v {
-            ReturnValue::Value(Value::String { value, pos: _ }) => Ok(value.clone()),
-            _ => Err(InterpreterError::UnexpectedValue {
-                msg: format!("Expect 'String', found {v}"),
-                pos: v.get_pos(),
-            }),
-        }
-    };
-
-    match operator {
-        Token::And(p) => Ok(ReturnValue::Value(Value::Boolean {
-            value: is_truthy(&lhs) && is_truthy(&rhs),
-            pos: p.clone(),
-        })),
-        Token::Or(p) => Ok(ReturnValue::Value(Value::Boolean {
-            value: is_truthy(&lhs) || is_truthy(&rhs),
-            pos: p.clone(),
-        })),
-        Token::EqualEqual(p) => Ok(ReturnValue::Value(Value::Boolean {
-            value: lhs == rhs,
-            pos: p.clone(),
-        })),
-        Token::BangEqual(p) => Ok(ReturnValue::Value(Value::Boolean {
-            value: lhs != rhs,
-            pos: p.clone(),
-        })),
-        Token::Less(p)
-            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
-                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
-        {
-            Ok(ReturnValue::Value(Value::Boolean {
-                value: get_float(&lhs)? < get_float(&rhs)?,
-                pos: p.clone(),
-            }))
-        }
-        Token::LessEqual(p)
-            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
-                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
-        {
-            Ok(ReturnValue::Value(Value::Boolean {
-                value: get_float(&lhs)? <= get_float(&rhs)?,
-                pos: p.clone(),
-            }))
-        }
-        Token::Greater(p)
-            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
-                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
-        {
-            Ok(ReturnValue::Value(Value::Boolean {
-                value: get_float(&lhs)? > get_float(&rhs)?,
-                pos: p.clone(),
-            }))
-        }
-        Token::GreaterEqual(p)
-            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
-                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
-        {
-            Ok(ReturnValue::Value(Value::Boolean {
-                value: get_float(&lhs)? >= get_float(&rhs)?,
-                pos: p.clone(),
-            }))
-        }
-        Token::Minus(p)
-            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
-                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
-        {
-            Ok(ReturnValue::Value(Value::Number {
-                value: get_float(&lhs)? - get_float(&rhs)?,
-                pos: p.clone(),
-            }))
-        }
-
-        Token::Star(p)
-            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
-                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
-        {
-            Ok(ReturnValue::Value(Value::Number {
-                value: get_float(&lhs)? * get_float(&rhs)?,
-                pos: p.clone(),
-            }))
-        }
-        Token::Slash(p)
-            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
-                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
-        {
-            Ok(ReturnValue::Value(Value::Number {
-                value: get_float(&lhs)? / get_float(&rhs)?,
-                pos: p.clone(),
-            }))
-        }
-        Token::Slash(_)
-        | Token::Star(_)
-        | Token::Greater(_)
-        | Token::GreaterEqual(_)
-        | Token::Less(_)
-        | Token::LessEqual(_)
-        | Token::Minus(_) => Err(InterpreterError::InvalidOperand {
-            msg: "Operands must be numbers.".to_string(),
-            pos: lhs.get_pos(),
-        }),
-        Token::Plus(_)
-            if matches!(lhs, ReturnValue::Value(Value::Number { .. }))
-                && matches!(rhs, ReturnValue::Value(Value::Number { .. })) =>
-        {
-            Ok(ReturnValue::Value(Value::Number {
-                value: get_float(&lhs)? + get_float(&rhs)?,
-                pos: lhs.get_pos(),
-            }))
-        }
-        Token::Plus(_)
-            if matches!(lhs, ReturnValue::Value(Value::String { .. }))
-                && matches!(rhs, ReturnValue::Value(Value::String { .. })) =>
-        {
-            Ok(ReturnValue::Value(Value::String {
-                value: get_string(&lhs)? + &get_string(&rhs)?,
-                pos: lhs.get_pos(),
-            }))
-        }
-        Token::Plus(_) => Err(InterpreterError::InvalidOperand {
-            msg: "Operands must be two numbers or two strings.".to_string(),
-            pos: lhs.get_pos(),
-        }),
-        _ => unreachable!("Binary expression only constructed with specific tokens."),
-    }
 }
 
 // #[cfg(test)]

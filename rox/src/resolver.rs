@@ -1,12 +1,8 @@
-use crate::interpreter::Variable;
 use crate::parser::Block;
 use crate::parser::Expression;
 use crate::parser::Function;
 use crate::parser::Identifier;
 use crate::parser::Statement;
-use crate::parser::Value;
-use crate::scanner::SourcePos;
-use crate::scanner::SourcePosition;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
@@ -31,21 +27,22 @@ impl Resolvable for Statement {
                 if let Some(init) = &mut var.initializer {
                     init.resolve(resolver)?;
                 }
+                resolver.define(&var.name);
             }
             Self::Function(Function {
                 name,
                 parameters,
                 body,
             }) => {
-                resolver.declare(&name);
+                resolver.declare(name);
                 // allow functions to recursively call themselves
-                resolver.define(&name);
+                resolver.define(name);
 
                 resolver.begin_scope();
 
                 for param in parameters.iter().flatten() {
-                    resolver.declare(&param);
-                    resolver.define(&param);
+                    resolver.declare(param);
+                    resolver.define(param);
                 }
 
                 body.resolve(resolver)?;

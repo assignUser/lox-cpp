@@ -515,7 +515,7 @@ impl<'a> Parser<'a> {
     }
 
     fn variable(&mut self) -> Result<Statement, ParserError> {
-        let name = self.identifier_from_token("Expect Variable name.")?;
+        let name = self.identifier_from_token("Expect variable name.")?;
 
         let mut initializer: Option<Expression> = None;
 

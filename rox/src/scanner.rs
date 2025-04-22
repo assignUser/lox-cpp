@@ -13,7 +13,7 @@ pub fn scan(source: &str) -> Result<ScannerResults, ScannerError> {
     Ok(scanner.collect::<ScannerResults>())
 }
 
-#[derive(Default, Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SourcePos {
     pub row: usize,
     pub col: usize,
@@ -616,7 +616,6 @@ mod scanner_tests {
 
     #[test]
     fn scan_errors() {
-        // assert_eq!(scan("//hallß"), Err(ScannerError::NonAsciiCharacer));
 
         let mut errors = Scanner {
             source: AsciiSource::build("@@\n #").unwrap(),

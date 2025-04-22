@@ -54,6 +54,8 @@ pub mod cli {
 
         print_prompt();
         for line in io::stdin().lines() {
+            // TODO this is broken because each line runs in a separate interpreter loosing all
+            // context
             let res = run(&line.expect("stdin should be readable!"));
             if res.is_err() {
                 eprintln!("{:?}", res.unwrap_err());
