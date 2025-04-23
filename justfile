@@ -2,6 +2,7 @@
 default: workflow
 
 root := `pwd`
+export CMAKE_POLICY_VERSION_MINIMUM := "3.5"
 export CMAKE_EXPORT_COMPILE_COMMANDS := "ON"
 export CMAKE_GENERATOR := "Ninja"
 export CCACHE_DIR := root + "/.ccache"

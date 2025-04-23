@@ -7,12 +7,18 @@ platforms = ["linux-64"]
 version = "0.1.0"
 
 [tasks]
-build_cpp = "just"
-build_rs = { cmd = "cargo build", cwd = "rox/" }
-cppval = { cmd = "dart tool/bin/test.dart chap13_inheritance -i $PIXI_PROJECT_ROOT/build/lox/lox", cwd = "build/_deps/lox_tests-src" }
+build-cpp = "just"
+build-rs-release = { cmd = "cargo build -r", cwd = "rox/" }
 install_dart_deps= { cmd = "dart pub get", cwd = "rox/tests/craftinginterpreters/tool"}
-
-rsval = { cmd = "dart tool/bin/test.dart chap08_statements -i  $PIXI_PROJECT_ROOT/rox/target/debug/rox", cwd = "rox/tests/craftinginterpreters", depends_on = ["build_rs"]}
+cppval = { cmd = "dart tool/bin/test.dart chap13_inheritance -i $PIXI_PROJECT_ROOT/build/lox/lox", cwd = "build/_deps/lox_tests-src" , depends-on = ["build-cpp"]}
+rsval = { cmd = "dart tool/bin/test.dart chap08_statements -i  $PIXI_PROJECT_ROOT/rox/target/debug/rox", cwd = "rox/tests/craftinginterpreters", depends-on = ["build-rs"]}
+fib-cpp = { cmd = "time $PIXI_PROJECT_ROOT/build/lox/lox $PIXI_PROJECT_ROOT/test.lox", depends-on = ["build-cpp"] }
+fib-rs = { cmd = "time cargo run -r $PIXI_PROJECT_ROOT/test.lox" , cwd = "rox/"}
 
 [dependencies]
 dart-sdk = ">=2.18.2,<3"
+rust = ">=1.85.1"
+just = "*"
+gxx = "*"
+cmake = ">=3.26"
+time = "*"
