@@ -123,6 +123,17 @@ impl Resolvable for Expression {
             Self::Grouping { expr } => expr.resolve(resolver)?,
             Self::Literal(value) => {}
             Self::Unary { operator, rhs } => rhs.resolve(resolver)?,
+            Self::Call {
+                callee,
+                arguments,
+                pos,
+            } => {
+                callee.resolve(resolver)?;
+
+                for arg in arguments.iter_mut().flatten() {
+                    arg.resolve(resolver)?;
+                }
+            }
             _ => todo!(),
         };
         Ok(())

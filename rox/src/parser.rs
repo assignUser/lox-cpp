@@ -3,13 +3,13 @@ use std::{fmt::Display, iter::Peekable};
 
 use crate::scanner::{SourcePos, SourcePosition, Token};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier {
     pub name: String,
     pub pos: SourcePos,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
     Block(Block),
     Expression(Expression),
@@ -32,20 +32,20 @@ pub enum Statement {
     Var(Var),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     pub body: Vec<Statement>,
     pub key: SourcePos,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Class {
     pub name: Identifier,
     pub parent: Option<Identifier>,
     pub methods: Vec<Function>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
     pub name: Identifier,
     pub parameters: Option<Vec<Identifier>>,
@@ -64,13 +64,13 @@ impl Display for Function {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Var {
     pub name: Identifier,
     pub initializer: Option<Expression>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     Assign {
         name: Identifier,
@@ -83,7 +83,7 @@ pub enum Expression {
         rhs: Box<Expression>,
     },
     Call {
-        callee: Identifier,
+        callee: Box<Expression>,
         arguments: Option<Vec<Expression>>,
         pos: SourcePos,
     },
@@ -124,6 +124,8 @@ pub enum Value {
     Number { value: f64, pos: SourcePos },
     String { value: String, pos: SourcePos },
 }
+
+impl Eq for Value {}
 
 impl SourcePosition for Value {
     fn get_pos(&self) -> SourcePos {
@@ -694,6 +696,12 @@ impl<'a> Parser<'a> {
             // no return value
         } else {
             value = Some(take_variant!(self.expression()?, Expression)?);
+            consume!(
+                self,
+                Semicolon(_pos),
+                _pos,
+                "Expect ';' after return value."
+            )?;
         }
 
         Ok(Statement::Return { keyword, value })
@@ -863,20 +871,8 @@ impl<'a> Parser<'a> {
     }
 
     fn finish_call(&mut self, callee: Statement) -> Result<Statement, ParserError> {
-        let callee_name = match callee {
-            Statement::Expression(Expression::Literal(Value::String { value, pos })) => {
-                Identifier {
-                    name: value.clone(),
-                    pos,
-                }
-            }
-            _ => {
-                return Err(ParserError::UnexpectedStatement {
-                    stmt: callee,
-                    message: "Identifier expected as callee name!".to_string(),
-                })
-            }
-        };
+        // Consume (
+        self.iter.next();
 
         let mut args: Vec<Expression> = vec![];
 
@@ -884,18 +880,16 @@ impl<'a> Parser<'a> {
             // empty call ()
         } else {
             args.push(take_variant!(self.expression()?, Expression)?);
-
             while let Token::Comma(_) = self.peek() {
                 // Consume ,
                 self.iter.next();
                 args.push(take_variant!(self.expression()?, Expression)?);
             }
         }
-
         let pos = consume!(self, RightParen(pos), pos, "Expect ')' after arguments.")?;
 
         Ok(Statement::Expression(Expression::Call {
-            callee: callee_name,
+            callee: self.box_expression(callee)?,
             arguments: Some(args),
             pos: pos.clone(),
         }))

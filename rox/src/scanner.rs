@@ -517,6 +517,8 @@ pub enum Token {
     Eof,
 }
 
+impl Eq for Token {}
+
 impl SourcePosition for Token {
     fn get_pos(&self) -> SourcePos {
         match self {
@@ -616,7 +618,6 @@ mod scanner_tests {
 
     #[test]
     fn scan_errors() {
-
         let mut errors = Scanner {
             source: AsciiSource::build("@@\n #").unwrap(),
         };

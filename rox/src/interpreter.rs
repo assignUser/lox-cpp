@@ -1,15 +1,82 @@
-use crate::parser::{Class, Expression, Function, Identifier, Statement, Value};
+use crate::parser::{Expression, Function, Identifier, Statement, Value};
 use crate::scanner::{SourcePos, SourcePosition, Token};
-use crate::take_variant;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::rc::Rc;
+use std::vec;
 
-#[derive(Debug, Clone)]
+trait Callable {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        arguments: Vec<ReturnValue>,
+        pos: &SourcePos,
+    ) -> Result<ReturnValue, InterpreterError>;
+    fn arity(&self) -> Result<usize, InterpreterError>;
+}
+
+#[derive(Debug, Clone, Eq)]
 pub enum ReturnValue {
     Return(Box<ReturnValue>),
     Value(Value),
     Function(Function),
     // Class(Class),
+}
+
+impl Callable for ReturnValue {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        arguments: Vec<ReturnValue>,
+        pos: &SourcePos,
+    ) -> Result<ReturnValue, InterpreterError> {
+        match self {
+            Self::Function(function) => {
+                // ExprPtr return_value = interpreter.executeBlock(decl.body, env);
+                // if (not m_isInitializer) {
+                //   return std::move(return_value);
+                interpreter.add_scope();
+
+                for (param, value) in function
+                    .parameters
+                    .iter()
+                    .flatten()
+                    .zip(arguments.into_iter())
+                {
+                    interpreter.assign_var(param, value);
+                }
+
+                let body = Statement::Block(function.body.clone());
+                let value = interpreter.execute(&body)?;
+
+                interpreter.pop_frame();
+
+                if let Some(value) = value {
+                    Ok(value)
+                } else {
+                    Ok(ReturnValue::Value(Value::Nil(pos.clone())))
+                }
+            }
+            _ => {
+                dbg!("not callable");
+                Err(InterpreterError::Error)
+            }
+        }
+    }
+
+    fn arity(&self) -> Result<usize, InterpreterError> {
+        match self {
+            Self::Function(function) => {
+                let arity = function.parameters.as_ref().map_or(3, |v| v.len());
+                Ok(arity)
+            }
+            _ => {
+                dbg!("not callable");
+                Err(InterpreterError::Error)
+            }
+        }
+    }
 }
 
 impl SourcePosition for ReturnValue {
@@ -65,17 +132,24 @@ type Scope = HashMap<String, ReturnValue>;
 
 pub struct Interpreter {
     globals: Scope,
-    locals: HashMap<SourcePos, Scope>,
-    stack: Vec<SourcePos>,
+    locals: Vec<Rc<RefCell<Scope>>>,
+    stack: Vec<usize>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
             globals: HashMap::new(),
-            locals: HashMap::new(),
+            locals: vec![],
             stack: vec![],
         }
+    }
+
+    fn add_scope(&mut self) {
+        let new_scope = Rc::new(RefCell::new(Scope::new()));
+        let i = self.locals.len();
+        self.locals.push(new_scope);
+        self.stack.push(i);
     }
 
     pub fn interpret(&mut self, statements: &Vec<Statement>) -> Result<(), InterpreterError> {
@@ -92,8 +166,7 @@ impl Interpreter {
     fn execute(&mut self, statement: &Statement) -> Result<Option<ReturnValue>, InterpreterError> {
         match statement {
             Statement::Block(block) => {
-                self.stack.push(block.key.clone());
-                self.locals.insert(block.key.clone(), HashMap::new());
+                self.add_scope();
 
                 for stmt in block.body.iter() {
                     let result = self.execute(stmt)?;
@@ -144,7 +217,13 @@ impl Interpreter {
                     )?;
                 }
             }
-            _ => todo!(),
+            Statement::Function(function) => {
+                self.assign_var(&function.name, ReturnValue::Function(function.clone()))?;
+            }
+            _ => {
+                dbg!(&statement);
+                todo!()
+            }
         };
 
         Ok(None)
@@ -185,6 +264,22 @@ impl Interpreter {
                 scope_depth,
             } => self.eval_assign(name, value, scope_depth),
             Expression::Variable { name, scope_depth } => self.lookup_variable(name, scope_depth),
+            Expression::Call {
+                callee,
+                arguments,
+                pos,
+            } => {
+                let callee = self.evaluate(callee)?;
+                let mut args = vec![];
+
+                if let Some(arguments) = arguments {
+                    for arg in arguments {
+                        args.push(self.evaluate(arg)?);
+                    }
+                }
+
+                callee.call(self, args, pos)
+            }
             _ => todo!(),
         }
     }
@@ -235,10 +330,10 @@ impl Interpreter {
 
         let local_scope = self
             .locals
-            .get_mut(&self.stack[self.stack.len() - (scope_depth + 1)]);
+            .get_mut(self.stack[self.stack.len() - (scope_depth + 1)]);
 
         if let Some(local_scope) = local_scope {
-            local_scope.insert(name.name.clone(), value);
+            local_scope.borrow_mut().insert(name.name.clone(), value);
         } else {
             // missing expected scope
             dbg!("missing expected scope");
@@ -282,6 +377,7 @@ impl Interpreter {
             Ok(value.clone())
         } else {
             // add proper error
+            dbg!(name);
             dbg!("undefined variable");
             Err(InterpreterError::Error)
         }
@@ -295,8 +391,8 @@ impl Interpreter {
         for (_, scope_pos) in self.stack.iter().enumerate().rev().skip(depth) {
             let value;
 
-            if let Some(local_scope) = self.locals.get(scope_pos) {
-                value = local_scope.get(name).cloned();
+            if let Some(local_scope) = self.locals.get(*scope_pos) {
+                value = local_scope.borrow_mut().get(name).cloned();
             } else {
                 // missing expected scope
                 dbg!("missing expected scope");

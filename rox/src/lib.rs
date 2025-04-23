@@ -20,7 +20,7 @@ pub enum LoxError {
 
 pub mod cli {
     use crate::interpreter::Interpreter;
-    
+
     use crate::resolver::Resolver;
     use crate::scanner::Token;
     use crate::LoxError;
@@ -73,7 +73,6 @@ pub mod cli {
     }
 
     fn run(source: &str) -> Result<(), LoxError> {
-        
         let tokens = scanner::scan(source).map_err(LoxError::Scanner)?;
 
         let errors: Vec<ScannerError> = tokens
@@ -89,12 +88,16 @@ pub mod cli {
 
         let mut parser = Parser::new(&tokens);
         let mut statements = parser.parse().map_err(LoxError::Parser)?;
-        
+
         let mut resolver = Resolver::new();
-        resolver.resolve(&mut statements).map_err(LoxError::Resolver)?;
+        resolver
+            .resolve(&mut statements)
+            .map_err(LoxError::Resolver)?;
 
         let mut interp = Interpreter::new();
-        interp.interpret(&statements).map_err(LoxError::Interpreter)?;
+        interp
+            .interpret(&statements)
+            .map_err(LoxError::Interpreter)?;
 
         Ok(())
     }
