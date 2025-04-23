@@ -132,7 +132,7 @@ trait Callable {
 
 #[derive(Debug, Clone, Eq)]
 pub enum ReturnValue {
-    Return(Box<ReturnValue>),
+    Return(Rc<ReturnValue>),
     Value(Value),
     Function(Function),
     // Class(Class),
@@ -277,7 +277,7 @@ impl Interpreter {
                     let result = self.execute(stmt)?;
                     if let Some(ReturnValue::Return(value)) = result {
                         self.local_env = old_env;
-                        return Ok(Some(*value));
+                        return Ok(Some(Rc::into_inner(value).expect("this should be a new value")));
                     }
                 }
 
@@ -308,7 +308,7 @@ impl Interpreter {
             }
             Statement::Return { keyword: _, value } => {
                 if let Some(value) = value {
-                    return Ok(Some(ReturnValue::Return(Box::new(self.evaluate(value)?))));
+                    return Ok(Some(ReturnValue::Return(Rc::new(self.evaluate(value)?))));
                 }
             }
             Statement::Var(var) => {

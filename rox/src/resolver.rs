@@ -4,6 +4,7 @@ use crate::parser::Function;
 use crate::parser::Identifier;
 use crate::parser::Statement;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub enum ResolverError {
@@ -56,9 +57,13 @@ impl Resolvable for Statement {
                 else_branch,
             } => {
                 condition.resolve(resolver)?;
-                then_branch.resolve(resolver)?;
+                Rc::get_mut(then_branch)
+                    .expect("this has ownership")
+                    .resolve(resolver)?;
                 if let Some(else_stmt) = else_branch {
-                    else_stmt.resolve(resolver)?;
+                    Rc::get_mut(else_stmt)
+                        .expect("this has ownership")
+                        .resolve(resolver)?;
                 }
             }
             Self::Print(expr) => expr.resolve(resolver)?,
@@ -69,7 +74,9 @@ impl Resolvable for Statement {
             }
             Self::While { condition, body } => {
                 condition.resolve(resolver)?;
-                body.resolve(resolver)?;
+                Rc::get_mut(body)
+                    .expect("this has ownership")
+                    .resolve(resolver)?;
             }
             Self::Class(_) => todo!(),
         };
@@ -113,22 +120,38 @@ impl Resolvable for Expression {
                 value,
                 scope_depth,
             } => {
-                value.resolve(resolver)?;
+                Rc::get_mut(value)
+                    .expect("this has ownership")
+                    .resolve(resolver)?;
                 *scope_depth = resolver.get_depth(&name.name);
             }
-            Self::Binary { lhs, operator: _, rhs } => {
-                lhs.resolve(resolver)?;
-                rhs.resolve(resolver)?;
+            Self::Binary {
+                lhs,
+                operator: _,
+                rhs,
+            } => {
+                Rc::get_mut(lhs)
+                    .expect("this has ownership")
+                    .resolve(resolver)?;
+                Rc::get_mut(rhs)
+                    .expect("this has ownership")
+                    .resolve(resolver)?;
             }
-            Self::Grouping { expr } => expr.resolve(resolver)?,
+            Self::Grouping { expr } => Rc::get_mut(expr)
+                .expect("this has ownership")
+                .resolve(resolver)?,
             Self::Literal(_value) => {}
-            Self::Unary { operator: _, rhs } => rhs.resolve(resolver)?,
+            Self::Unary { operator: _, rhs } => Rc::get_mut(rhs)
+                .expect("this has ownership")
+                .resolve(resolver)?,
             Self::Call {
                 callee,
                 arguments,
-                pos:_,
+                pos: _,
             } => {
-                callee.resolve(resolver)?;
+                Rc::get_mut(callee)
+                    .expect("this has ownership")
+                    .resolve(resolver)?;
 
                 for arg in arguments.iter_mut().flatten() {
                     arg.resolve(resolver)?;

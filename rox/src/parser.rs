@@ -1,4 +1,5 @@
 use core::slice::Iter;
+use std::rc::Rc;
 use std::{fmt::Display, iter::Peekable};
 
 use crate::scanner::{SourcePos, SourcePosition, Token};
@@ -15,8 +16,8 @@ pub enum Statement {
     Expression(Expression),
     If {
         condition: Expression,
-        then_branch: Box<Statement>,
-        else_branch: Option<Box<Statement>>,
+        then_branch: Rc<Statement>,
+        else_branch: Option<Rc<Statement>>,
     },
     Print(Expression),
     Return {
@@ -25,7 +26,7 @@ pub enum Statement {
     },
     While {
         condition: Expression,
-        body: Box<Statement>,
+        body: Rc<Statement>,
     },
     Class(Class),
     Function(Function),
@@ -74,30 +75,30 @@ pub struct Var {
 pub enum Expression {
     Assign {
         name: Identifier,
-        value: Box<Expression>,
+        value: Rc<Expression>,
         scope_depth: Option<usize>,
     },
     Binary {
-        lhs: Box<Expression>,
+        lhs: Rc<Expression>,
         operator: Token,
-        rhs: Box<Expression>,
+        rhs: Rc<Expression>,
     },
     Call {
-        callee: Box<Expression>,
+        callee: Rc<Expression>,
         arguments: Option<Vec<Expression>>,
         pos: SourcePos,
     },
     Get {
         name: Identifier,
-        object: Box<Expression>,
+        object: Rc<Expression>,
     },
     Grouping {
-        expr: Box<Expression>,
+        expr: Rc<Expression>,
     },
     Set {
-        value: Box<Expression>,
+        value: Rc<Expression>,
         name: Identifier,
-        object: Box<Expression>,
+        object: Rc<Expression>,
     },
     Super {
         keyword: Token,
@@ -108,7 +109,7 @@ pub enum Expression {
     },
     Unary {
         operator: Token,
-        rhs: Box<Expression>,
+        rhs: Rc<Expression>,
     },
     Variable {
         name: Identifier,
@@ -646,7 +647,7 @@ impl<'a> Parser<'a> {
 
         for_body.push(Statement::While {
             condition,
-            body: Box::new(Statement::Block(Block {
+            body: Rc::new(Statement::Block(Block {
                 key: while_pos,
                 body: while_body,
             })),
@@ -665,11 +666,11 @@ impl<'a> Parser<'a> {
 
         consume!(self, RightParen(_pos), _pos, "Expect ')' after 'if'.")?;
 
-        let then_branch = Box::new(self.statement()?);
+        let then_branch = Rc::new(self.statement()?);
         let mut else_branch = None;
 
         if let Token::Else(_) = self.peek() {
-            else_branch = Some(Box::new(self.statement()?));
+            else_branch = Some(Rc::new(self.statement()?));
         }
 
         Ok(Statement::If {
@@ -714,7 +715,7 @@ impl<'a> Parser<'a> {
 
         consume!(self, RightParen(_), (), "Expect ')' after condition.")?;
 
-        let body = Box::new(self.statement()?);
+        let body = Rc::new(self.statement()?);
 
         Ok(Statement::While { condition, body })
     }
@@ -734,9 +735,9 @@ impl<'a> Parser<'a> {
         Ok(Statement::Block(Block { body: stmts, key }))
     }
 
-    fn box_expression(&self, stmt: Statement) -> Result<Box<Expression>, ParserError> {
+    fn box_expression(&self, stmt: Statement) -> Result<Rc<Expression>, ParserError> {
         match stmt {
-            Statement::Expression(e) => Ok(Box::new(e)),
+            Statement::Expression(e) => Ok(Rc::new(e)),
             _ => Err(ParserError::Error),
         }
     }
