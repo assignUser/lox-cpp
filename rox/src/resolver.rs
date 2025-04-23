@@ -62,7 +62,7 @@ impl Resolvable for Statement {
                 }
             }
             Self::Print(expr) => expr.resolve(resolver)?,
-            Self::Return { keyword, value } => {
+            Self::Return { keyword: _, value } => {
                 if let Some(expr) = value {
                     expr.resolve(resolver)?;
                 }
@@ -116,17 +116,17 @@ impl Resolvable for Expression {
                 value.resolve(resolver)?;
                 *scope_depth = resolver.get_depth(&name.name);
             }
-            Self::Binary { lhs, operator, rhs } => {
+            Self::Binary { lhs, operator: _, rhs } => {
                 lhs.resolve(resolver)?;
                 rhs.resolve(resolver)?;
             }
             Self::Grouping { expr } => expr.resolve(resolver)?,
-            Self::Literal(value) => {}
-            Self::Unary { operator, rhs } => rhs.resolve(resolver)?,
+            Self::Literal(_value) => {}
+            Self::Unary { operator: _, rhs } => rhs.resolve(resolver)?,
             Self::Call {
                 callee,
                 arguments,
-                pos,
+                pos:_,
             } => {
                 callee.resolve(resolver)?;
 

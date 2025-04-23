@@ -14,7 +14,7 @@ fn main() {
             eprintln!("{e}");
             process::exit(65)
         }
-        Err(e) => {
+        Err(_e) => {
             // eprintln!("Application error: {e:#?}");
             process::exit(65);
         }

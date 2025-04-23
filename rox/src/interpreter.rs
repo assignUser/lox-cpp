@@ -1,10 +1,124 @@
+#![allow(dead_code)]
 use crate::parser::{Expression, Function, Identifier, Statement, Value};
 use crate::scanner::{SourcePos, SourcePosition, Token};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::vec;
+
+type ScopePtr = Rc<RefCell<Scope>>;
+type EnvPtr = Rc<RefCell<Env>>;
+
+struct Env {
+    pub enclosing: Option<EnvPtr>,
+    locals: ScopePtr,
+    this: Weak<RefCell<Env>>,
+}
+
+impl Env {
+    pub fn new(enclosing: Option<EnvPtr>) -> EnvPtr {
+        Rc::new_cyclic(|me| {
+            RefCell::new(Env {
+                enclosing,
+                locals: Rc::new(RefCell::new(Scope::new())),
+                this: me.clone(),
+            })
+        })
+    }
+
+    pub fn contains(&self, key: &Identifier) -> bool {
+        self.locals.borrow().contains_key(&key.name)
+    }
+
+    pub fn define(&mut self, name: String, value: ReturnValue) {
+        self.locals.borrow_mut().insert(name, value);
+    }
+    pub fn get(&self, name: &Identifier) -> Result<ReturnValue, InterpreterError> {
+        self.get_impl(name, 0, true)
+    }
+    pub fn get_at(
+        &self,
+        name: &Identifier,
+        distance: usize,
+    ) -> Result<ReturnValue, InterpreterError> {
+        self.get_impl(name, distance, false)
+    }
+    fn get_impl(
+        &self,
+        name: &Identifier,
+        distance: usize,
+        search_enclosing: bool,
+    ) -> Result<ReturnValue, InterpreterError> {
+        let env = self.ancestor(distance)?;
+
+        if let Some(value) = env.borrow().locals.borrow().get(&name.name) {
+            return Ok(value.clone());
+        }
+
+        if search_enclosing {
+            if let Some(enclosing) = &self.enclosing {
+                return enclosing.borrow().get(name);
+            }
+        }
+
+        dbg!("undefined var");
+        Err(InterpreterError::Error)
+    }
+
+    fn ancestor(&self, distance: usize) -> Result<EnvPtr, InterpreterError> {
+        let mut maybe_env = self
+            .this
+            .upgrade()
+            .expect("This can't be dropped while running a method");
+
+        for _ in 0..distance {
+            let borrowed_env = maybe_env
+                .borrow()
+                .enclosing
+                .clone()
+                .ok_or(InterpreterError::Error)?;
+            maybe_env = borrowed_env;
+        }
+
+        Ok(maybe_env)
+    }
+
+    pub fn assign(
+        &mut self,
+        name: &Identifier,
+        value: ReturnValue,
+    ) -> Result<(), InterpreterError> {
+        dbg!(name);
+        if self.locals.borrow().contains_key(&name.name) {
+            self.locals.borrow_mut().insert(name.name.clone(), value);
+        } else if let Some(enclosing) = &self.enclosing {
+            enclosing.borrow_mut().assign(name, value)?;
+        } else {
+            dbg!("assign error");
+            return Err(InterpreterError::Error);
+        }
+
+        Ok(())
+    }
+
+    pub fn assign_at(
+        &mut self,
+        name: &Identifier,
+        value: ReturnValue,
+        distance: usize,
+    ) -> Result<(), InterpreterError> {
+        if distance > 0 {
+            self.ancestor(distance)?
+                .borrow_mut()
+                .define(name.name.clone(), value);
+        } else {
+            self.define(name.name.clone(), value);
+        }
+
+        Ok(())
+    }
+}
 
 trait Callable {
     fn call(
@@ -33,10 +147,8 @@ impl Callable for ReturnValue {
     ) -> Result<ReturnValue, InterpreterError> {
         match self {
             Self::Function(function) => {
-                // ExprPtr return_value = interpreter.executeBlock(decl.body, env);
-                // if (not m_isInitializer) {
-                //   return std::move(return_value);
-                interpreter.add_scope();
+                let old_env = interpreter.local_env.clone();
+                interpreter.local_env = Env::new(Some(old_env.clone()));
 
                 for (param, value) in function
                     .parameters
@@ -44,13 +156,13 @@ impl Callable for ReturnValue {
                     .flatten()
                     .zip(arguments.into_iter())
                 {
-                    interpreter.assign_var(param, value);
+                    interpreter.local_env.borrow_mut().assign_at(param, value, 0)?;
                 }
 
                 let body = Statement::Block(function.body.clone());
                 let value = interpreter.execute(&body)?;
 
-                interpreter.pop_frame();
+                interpreter.local_env = old_env;
 
                 if let Some(value) = value {
                     Ok(value)
@@ -131,25 +243,17 @@ impl Display for InterpreterError {
 type Scope = HashMap<String, ReturnValue>;
 
 pub struct Interpreter {
-    globals: Scope,
-    locals: Vec<Rc<RefCell<Scope>>>,
-    stack: Vec<usize>,
+    global_env: EnvPtr,
+    local_env: EnvPtr,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let global_env = Env::new(None);
         Self {
-            globals: HashMap::new(),
-            locals: vec![],
-            stack: vec![],
+            global_env: global_env.clone(),
+            local_env: global_env.clone(), 
         }
-    }
-
-    fn add_scope(&mut self) {
-        let new_scope = Rc::new(RefCell::new(Scope::new()));
-        let i = self.locals.len();
-        self.locals.push(new_scope);
-        self.stack.push(i);
     }
 
     pub fn interpret(&mut self, statements: &Vec<Statement>) -> Result<(), InterpreterError> {
@@ -166,16 +270,18 @@ impl Interpreter {
     fn execute(&mut self, statement: &Statement) -> Result<Option<ReturnValue>, InterpreterError> {
         match statement {
             Statement::Block(block) => {
-                self.add_scope();
+                let old_env = self.local_env.clone();
+                self.local_env = Env::new(Some(old_env.clone()));
 
                 for stmt in block.body.iter() {
                     let result = self.execute(stmt)?;
                     if let Some(ReturnValue::Return(value)) = result {
-                        self.pop_frame();
+                        self.local_env = old_env;
                         return Ok(Some(*value));
                     }
                 }
-                self.pop_frame();
+
+                self.local_env = old_env;
             }
             Statement::Expression(expr) => {
                 return Ok(Some(self.evaluate(expr)?));
@@ -200,7 +306,7 @@ impl Interpreter {
                     }
                 }
             }
-            Statement::Return { keyword, value } => {
+            Statement::Return { keyword: _, value } => {
                 if let Some(value) = value {
                     return Ok(Some(ReturnValue::Return(Box::new(self.evaluate(value)?))));
                 }
@@ -209,16 +315,21 @@ impl Interpreter {
                 if let Some(init) = &var.initializer {
                     let init = self.evaluate(init)?;
 
-                    self.assign_var(&var.name, init)?;
+                    self.local_env.borrow_mut().assign_at(&var.name, init, 0)?;
                 } else {
-                    self.assign_var(
+                    self.local_env.borrow_mut().assign_at(
                         &var.name,
                         ReturnValue::Value(Value::Nil(SourcePos { row: 0, col: 0 })),
+                        0,
                     )?;
                 }
             }
             Statement::Function(function) => {
-                self.assign_var(&function.name, ReturnValue::Function(function.clone()))?;
+                self.local_env.as_ref().borrow_mut().assign_at(
+                    &function.name,
+                    ReturnValue::Function(function.clone()),
+                    0,
+                )?;
             }
             _ => {
                 dbg!(&statement);
@@ -229,27 +340,19 @@ impl Interpreter {
         Ok(None)
     }
 
-    fn assign_var(
-        &mut self,
-        name: &Identifier,
-        value: ReturnValue,
-    ) -> Result<(), InterpreterError> {
-        if self.stack.is_empty() {
-            self.assign_global(name, value)?;
-        } else {
-            self.assign_local(0, name, value)?;
-        }
-
-        Ok(())
-    }
-
-    fn pop_frame(&mut self) {
-        self.stack.pop();
-        // Clean up local scopes once back to global
-        if self.stack.is_empty() {
-            self.locals.clear();
-        }
-    }
+    // fn assign_var(
+    //     &mut self,
+    //     name: &Identifier,
+    //     value: ReturnValue,
+    // ) -> Result<(), InterpreterError> {
+    //     if self.stack.is_empty() {
+    //         self.assign_global(name, value)?;
+    //     } else {
+    //         self.assign_local(0, name, value)?;
+    //     }
+    //
+    //     Ok(())
+    // }
 
     // evaluate an expression
     pub fn evaluate(&mut self, expr: &Expression) -> Result<ReturnValue, InterpreterError> {
@@ -316,42 +419,42 @@ impl Interpreter {
     // },
     // Literal(Value),
 
-    fn assign_local(
-        &mut self,
-        scope_depth: usize,
-        name: &Identifier,
-        value: ReturnValue,
-    ) -> Result<(), InterpreterError> {
-        if self.stack.len() < scope_depth + 1 {
-            // assignment assumes more nested scopes than exist
-            dbg!("depth > stack");
-            return Err(InterpreterError::Error);
-        }
+    // fn assign_local(
+    //     &mut self,
+    //     scope_depth: usize,
+    //     name: &Identifier,
+    //     value: ReturnValue,
+    // ) -> Result<(), InterpreterError> {
+    //     if self.stack.len() < scope_depth + 1 {
+    //         // assignment assumes more nested scopes than exist
+    //         dbg!("depth > stack");
+    //         return Err(InterpreterError::Error);
+    //     }
+    //
+    //     let local_scope = self
+    //         .locals
+    //         .get_mut(self.stack[self.stack.len() - (scope_depth + 1)]);
+    //
+    //     if let Some(local_scope) = local_scope {
+    //         local_scope.borrow_mut().insert(name.name.clone(), value);
+    //     } else {
+    //         // missing expected scope
+    //         dbg!("missing expected scope");
+    //         return Err(InterpreterError::Error);
+    //     }
+    //
+    //     Ok(())
+    // }
 
-        let local_scope = self
-            .locals
-            .get_mut(self.stack[self.stack.len() - (scope_depth + 1)]);
-
-        if let Some(local_scope) = local_scope {
-            local_scope.borrow_mut().insert(name.name.clone(), value);
-        } else {
-            // missing expected scope
-            dbg!("missing expected scope");
-            return Err(InterpreterError::Error);
-        }
-
-        Ok(())
-    }
-
-    fn assign_global(
-        &mut self,
-        name: &Identifier,
-        value: ReturnValue,
-    ) -> Result<(), InterpreterError> {
-        self.globals.insert(name.name.clone(), value);
-
-        Ok(())
-    }
+    // fn assign_global(
+    //     &mut self,
+    //     name: &Identifier,
+    //     value: ReturnValue,
+    // ) -> Result<(), InterpreterError> {
+    //     self.globals.insert(name.name.clone(), value);
+    //
+    //     Ok(())
+    // }
 
     fn lookup_variable(
         &self,
@@ -359,53 +462,47 @@ impl Interpreter {
         scope_depth: &Option<usize>,
     ) -> Result<ReturnValue, InterpreterError> {
         if let Some(depth) = scope_depth {
-            let maybe_value = self.lookup_local(&name.name, *depth)?;
-
-            if let Some(value) = maybe_value {
-                return Ok(value);
-            }
-            // not found, must be global
-            self.lookup_global(&name.name)
+            self.local_env.borrow().get_at(name, *depth)
         } else {
-            self.lookup_global(&name.name)
+            self.global_env.borrow().get(name)
         }
     }
 
-    fn lookup_global(&self, name: &String) -> Result<ReturnValue, InterpreterError> {
-        let value = self.globals.get(name);
-        if let Some(value) = value {
-            Ok(value.clone())
-        } else {
-            // add proper error
-            dbg!(name);
-            dbg!("undefined variable");
-            Err(InterpreterError::Error)
-        }
-    }
+    // fn lookup_global(&self, name: &String) -> Result<ReturnValue, InterpreterError> {
+    //     let value = self.globals.get(name);
+    //     if let Some(value) = value {
+    //         Ok(value.clone())
+    //     } else {
+    //         // add proper error
+    //         dbg!(name);
+    //         dbg!("undefined variable");
+    //         Err(InterpreterError::Error)
+    //     }
+    // }
 
-    fn lookup_local(
-        &self,
-        name: &String,
-        depth: usize,
-    ) -> Result<Option<ReturnValue>, InterpreterError> {
-        for (_, scope_pos) in self.stack.iter().enumerate().rev().skip(depth) {
-            let value;
-
-            if let Some(local_scope) = self.locals.get(*scope_pos) {
-                value = local_scope.borrow_mut().get(name).cloned();
-            } else {
-                // missing expected scope
-                dbg!("missing expected scope");
-                return Err(InterpreterError::Error);
-            }
-
-            if value.is_some() {
-                return Ok(value);
-            }
-        }
-        Ok(None)
-    }
-
+    // fn lookup_local(
+    //     &self,
+    //     name: &String,
+    //     depth: usize,
+    // ) -> Result<Option<ReturnValue>, InterpreterError> {
+    //     for (_, scope_pos) in self.stack.iter().enumerate().rev().skip(depth) {
+    //         let value;
+    //
+    //         if let Some(local_scope) = self.locals.get(*scope_pos) {
+    //             value = local_scope.borrow_mut().get(name).cloned();
+    //         } else {
+    //             // missing expected scope
+    //             dbg!("missing expected scope");
+    //             return Err(InterpreterError::Error);
+    //         }
+    //
+    //         if value.is_some() {
+    //             return Ok(value);
+    //         }
+    //     }
+    //     Ok(None)
+    // }
+    //
     fn eval_assign(
         &mut self,
         name: &Identifier,
@@ -415,9 +512,11 @@ impl Interpreter {
         let value = self.evaluate(value)?;
 
         if let Some(scope_depth) = scope_depth {
-            self.assign_local(*scope_depth, name, value.clone())?;
+            self.local_env
+                .borrow_mut()
+                .assign_at(name, value.clone(), *scope_depth)?;
         } else {
-            self.assign_global(name, value.clone())?;
+            self.global_env.borrow_mut().assign(name, value.clone())?;
         }
 
         Ok(value)
